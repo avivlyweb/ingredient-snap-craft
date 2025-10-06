@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
+import { ContextSelection } from "@/components/ContextSelection";
 import { RecipeDisplay } from "@/components/RecipeDisplay";
 import { RecipeGallery } from "@/components/RecipeGallery";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { ChefHat } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Recipe {
   title: string;
@@ -16,12 +18,18 @@ interface Recipe {
   cuisine_style: string;
   serving_suggestion: string;
   image_url?: string;
+  context_type?: string;
+  plating_guidance?: string;
+  time_management?: string;
+  ambiance_suggestions?: string;
+  leftover_tips?: string;
 }
 
 const Index = () => {
-  const [step, setStep] = useState<'upload' | 'ingredients' | 'recipe'>('upload');
+  const [step, setStep] = useState<'upload' | 'ingredients' | 'context' | 'recipe'>('upload');
   const [extractedIngredients, setExtractedIngredients] = useState<string[]>([]);
   const [ingredientImages, setIngredientImages] = useState<string[]>([]);
+  const [selectedContext, setSelectedContext] = useState<string>('');
   const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
@@ -32,13 +40,23 @@ const Index = () => {
     setStep('ingredients');
   };
 
-  const handleGenerateRecipe = async (ingredients: string[]) => {
+  const handleContextSelected = (contextType: string) => {
+    setSelectedContext(contextType);
+    setStep('context');
+  };
+
+  const handleProceedToRecipe = () => {
+    handleGenerateRecipe(extractedIngredients, selectedContext);
+  };
+
+  const handleGenerateRecipe = async (ingredients: string[], contextType: string) => {
     setIsGenerating(true);
+    setStep('recipe');
     try {
       // Generate recipe
       const { data: recipeData, error: recipeError } = await supabase.functions.invoke(
         'generate-recipe',
-        { body: { ingredients } }
+        { body: { ingredients, contextType } }
       );
 
       if (recipeError) throw recipeError;
@@ -89,7 +107,12 @@ const Index = () => {
         cuisine_style: generatedRecipe.cuisine_style,
         serving_suggestion: generatedRecipe.serving_suggestion,
         image_url: generatedRecipe.image_url,
-        ingredient_images: ingredientImages
+        ingredient_images: ingredientImages,
+        context_type: generatedRecipe.context_type,
+        plating_guidance: generatedRecipe.plating_guidance,
+        time_management: generatedRecipe.time_management,
+        ambiance_suggestions: generatedRecipe.ambiance_suggestions,
+        leftover_tips: generatedRecipe.leftover_tips
       });
 
       if (error) throw error;
@@ -113,6 +136,7 @@ const Index = () => {
     setStep('upload');
     setExtractedIngredients([]);
     setIngredientImages([]);
+    setSelectedContext('');
     setGeneratedRecipe(null);
   };
 
@@ -163,9 +187,30 @@ const Index = () => {
           {step === 'ingredients' && (
             <IngredientList
               ingredients={extractedIngredients}
-              onGenerateRecipe={handleGenerateRecipe}
-              isGenerating={isGenerating}
+              onGenerateRecipe={(ingredients) => {
+                setExtractedIngredients(ingredients);
+                setStep('context');
+              }}
+              isGenerating={false}
             />
+          )}
+
+          {step === 'context' && (
+            <>
+              <ContextSelection onSelectContext={handleContextSelected} />
+              {selectedContext && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleProceedToRecipe}
+                    disabled={isGenerating}
+                    size="lg"
+                    className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity px-12"
+                  >
+                    {isGenerating ? "Generating Recipe..." : "Generate My Recipe!"}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
 
           {step === 'recipe' && generatedRecipe && (

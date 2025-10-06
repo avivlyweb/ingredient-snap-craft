@@ -11,25 +11,43 @@ serve(async (req) => {
   }
 
   try {
-    const { ingredients } = await req.json();
+    const { ingredients, contextType } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log('Generating recipe for ingredients:', ingredients);
+    console.log('Generating recipe for ingredients:', ingredients, 'with context:', contextType);
 
-    const prompt = `Generate a detailed, creative recipe using ONLY these ingredients: ${ingredients.join(', ')}.
+    const contextInstructions = {
+      date_night: "Create a romantic, restaurant-quality dish that's impressive yet achievable. Focus on elegant presentation and intimate atmosphere. Include wine pairing suggestions.",
+      family_dinner: "Design a crowd-pleasing, comforting meal with generous portions. Emphasize ease of serving and family-friendly flavors. Suggest how to make it kid-approved.",
+      meal_prep: "Develop a batch-friendly recipe that stores and reheats beautifully. Focus on efficiency and how to portion for the week. Include storage tips.",
+      quick_lunch: "Create a fast, energizing meal with minimal cleanup. Prioritize speed without sacrificing flavor. Suggest portable options.",
+      entertaining: "Design a shareable, conversation-starting dish that's perfect for groups. Focus on impressive presentation and make-ahead elements.",
+      experimental: "Push creative boundaries with unique flavor combinations and interesting techniques. Include learning opportunities and skill-building elements."
+    };
+
+    const contextInstruction = contextInstructions[contextType as keyof typeof contextInstructions] || contextInstructions.family_dinner;
+
+    const prompt = `You are a professional chef creating a personalized recipe. Context: ${contextInstruction}
+
+Generate a detailed, creative recipe using ONLY these ingredients: ${ingredients.join(', ')}.
 
 Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {
-  "title": "Recipe name",
-  "description": "Brief appetizing description (2-3 sentences)",
+  "title": "Recipe name that reflects the context",
+  "description": "Brief appetizing description tailored to the occasion (2-3 sentences)",
   "ingredients": ["ingredient 1 with measurement", "ingredient 2 with measurement"],
   "steps": "Step 1: ...\nStep 2: ...\nStep 3: ...",
   "cuisine_style": "cuisine type (e.g., Italian, Asian, Mexican)",
-  "serving_suggestion": "serving and pairing tips"
+  "serving_suggestion": "context-appropriate serving and pairing tips",
+  "context_type": "${contextType}",
+  "plating_guidance": "Specific plating instructions tailored to ${contextType}. Be detailed about presentation.",
+  "time_management": "Timeline and prep tips specific to ${contextType}. Include what can be done ahead.",
+  "ambiance_suggestions": "Mood-setting tips for ${contextType} (music, lighting, table setting ideas)",
+  "leftover_tips": "Creative ways to transform leftovers or storage recommendations"
 }`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

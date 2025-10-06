@@ -11,6 +11,11 @@ interface Recipe {
   cuisine_style: string;
   serving_suggestion: string;
   image_url?: string;
+  context_type?: string;
+  plating_guidance?: string;
+  time_management?: string;
+  ambiance_suggestions?: string;
+  leftover_tips?: string;
 }
 
 interface RecipeDisplayProps {
@@ -85,6 +90,54 @@ export const RecipeDisplay = ({ recipe, onAddToGallery, isAdding }: RecipeDispla
               <div className="bg-muted/50 p-4 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">Serving Suggestion</h3>
                 <p className="text-muted-foreground">{recipe.serving_suggestion}</p>
+              </div>
+            </>
+          )}
+
+          {recipe.plating_guidance && (
+            <>
+              <Separator />
+              <div className="bg-gradient-to-br from-primary/5 to-accent/5 p-5 rounded-lg border border-primary/10">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  🎨 Plating Guidance
+                </h3>
+                <p className="text-muted-foreground">{recipe.plating_guidance}</p>
+              </div>
+            </>
+          )}
+
+          {recipe.time_management && (
+            <>
+              <Separator />
+              <div className="bg-gradient-to-br from-secondary/5 to-accent/5 p-5 rounded-lg border border-secondary/10">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  ⏱️ Time Management
+                </h3>
+                <p className="text-muted-foreground">{recipe.time_management}</p>
+              </div>
+            </>
+          )}
+
+          {recipe.ambiance_suggestions && (
+            <>
+              <Separator />
+              <div className="bg-gradient-to-br from-accent/5 to-primary/5 p-5 rounded-lg border border-accent/10">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  ✨ Ambiance Suggestions
+                </h3>
+                <p className="text-muted-foreground">{recipe.ambiance_suggestions}</p>
+              </div>
+            </>
+          )}
+
+          {recipe.leftover_tips && (
+            <>
+              <Separator />
+              <div className="bg-gradient-to-br from-muted/50 to-muted/30 p-5 rounded-lg border">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  ♻️ Leftover Magic
+                </h3>
+                <p className="text-muted-foreground">{recipe.leftover_tips}</p>
               </div>
             </>
           )}

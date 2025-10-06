@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       recipes: {
         Row: {
+          ambiance_suggestions: string | null
+          context_type: string | null
           created_at: string | null
           cuisine_style: string | null
           description: string
@@ -23,12 +25,17 @@ export type Database = {
           image_url: string | null
           ingredient_images: string[] | null
           ingredients: string[]
+          leftover_tips: string | null
+          plating_guidance: string | null
           serving_suggestion: string | null
           steps: string
+          time_management: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          ambiance_suggestions?: string | null
+          context_type?: string | null
           created_at?: string | null
           cuisine_style?: string | null
           description: string
@@ -36,12 +43,17 @@ export type Database = {
           image_url?: string | null
           ingredient_images?: string[] | null
           ingredients: string[]
+          leftover_tips?: string | null
+          plating_guidance?: string | null
           serving_suggestion?: string | null
           steps: string
+          time_management?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          ambiance_suggestions?: string | null
+          context_type?: string | null
           created_at?: string | null
           cuisine_style?: string | null
           description?: string
@@ -49,8 +61,11 @@ export type Database = {
           image_url?: string | null
           ingredient_images?: string[] | null
           ingredients?: string[]
+          leftover_tips?: string | null
+          plating_guidance?: string | null
           serving_suggestion?: string | null
           steps?: string
+          time_management?: string | null
           title?: string
           updated_at?: string | null
         }
