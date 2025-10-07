@@ -95,17 +95,24 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no extra
     // Parse the JSON from the response
     let recipe;
     try {
-      // Remove markdown code blocks if present
-      const cleanedText = recipeText.replace(/```json\n?|\n?```/g, '').trim();
+      // Remove markdown code blocks and clean the text
+      let cleanedText = recipeText
+        .replace(/```json\s*/g, '')
+        .replace(/```\s*/g, '')
+        .replace(/&/g, '\\&')  // Escape ampersands
+        .trim();
+      
+      // Extract JSON object if wrapped in text
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanedText = jsonMatch[0];
+      }
+      
       recipe = JSON.parse(cleanedText);
     } catch (e) {
-      // If parsing fails, try to extract JSON object from text
-      const match = recipeText.match(/\{[\s\S]*\}/);
-      if (match) {
-        recipe = JSON.parse(match[0]);
-      } else {
-        throw new Error("Failed to parse recipe from AI response");
-      }
+      console.error("JSON parse error:", e);
+      console.error("Attempted to parse:", recipeText);
+      throw new Error(`Failed to parse recipe: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
 
     console.log('Generated recipe:', recipe);

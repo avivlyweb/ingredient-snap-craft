@@ -4,6 +4,7 @@ import { IngredientList } from "@/components/IngredientList";
 import { ContextSelection } from "@/components/ContextSelection";
 import { RecipeDisplay } from "@/components/RecipeDisplay";
 import { RecipeGallery } from "@/components/RecipeGallery";
+import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -213,12 +214,18 @@ const Index = () => {
             </>
           )}
 
-          {step === 'recipe' && generatedRecipe && (
-            <RecipeDisplay
-              recipe={generatedRecipe}
-              onAddToGallery={handleAddToGallery}
-              isAdding={isAddingToGallery}
-            />
+          {step === 'recipe' && (
+            <>
+              {isGenerating ? (
+                <RecipeGenerationAnimation ingredients={extractedIngredients} />
+              ) : generatedRecipe ? (
+                <RecipeDisplay
+                  recipe={generatedRecipe}
+                  onAddToGallery={handleAddToGallery}
+                  isAdding={isAddingToGallery}
+                />
+              ) : null}
+            </>
           )}
 
           {/* Community Gallery */}
