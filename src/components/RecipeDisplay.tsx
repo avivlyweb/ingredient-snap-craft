@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { NutritionLabel } from "@/components/NutritionLabel";
+import { HealthInsights } from "@/components/HealthInsights";
 
 interface Recipe {
   title: string;
@@ -16,6 +18,18 @@ interface Recipe {
   time_management?: string;
   ambiance_suggestions?: string;
   leftover_tips?: string;
+  nutrition?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    fiber?: number;
+  };
+  health_insights?: Array<{
+    title: string;
+    description: string;
+    type: 'benefit' | 'synergy' | 'tip';
+  }>;
 }
 
 interface RecipeDisplayProps {
@@ -60,6 +74,23 @@ export const RecipeDisplay = ({ recipe, onAddToGallery, isAdding }: RecipeDispla
           <p className="text-lg text-muted-foreground leading-relaxed">
             {recipe.description}
           </p>
+
+          {recipe.nutrition && (
+            <>
+              <Separator />
+              <NutritionLabel nutrition={recipe.nutrition} servings={4} />
+            </>
+          )}
+
+          {recipe.health_insights && recipe.health_insights.length > 0 && (
+            <>
+              <Separator />
+              <HealthInsights 
+                insights={recipe.health_insights} 
+                contextType={recipe.context_type}
+              />
+            </>
+          )}
 
           <Separator />
 

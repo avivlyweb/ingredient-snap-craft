@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
-import { ContextSelection } from "@/components/ContextSelection";
+import { NutritionEnhancedContextSelection } from "@/components/NutritionEnhancedContextSelection";
 import { RecipeDisplay } from "@/components/RecipeDisplay";
 import { RecipeGallery } from "@/components/RecipeGallery";
 import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
@@ -26,6 +26,18 @@ interface Recipe {
   time_management?: string;
   ambiance_suggestions?: string;
   leftover_tips?: string;
+  nutrition?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    fiber?: number;
+  };
+  health_insights?: Array<{
+    title: string;
+    description: string;
+    type: 'benefit' | 'synergy' | 'tip';
+  }>;
 }
 
 const Index = () => {
@@ -37,6 +49,7 @@ const Index = () => {
   const [extractedIngredients, setExtractedIngredients] = useState<string[]>([]);
   const [ingredientImages, setIngredientImages] = useState<string[]>([]);
   const [selectedContext, setSelectedContext] = useState<string>('');
+  const [selectedHealthGoals, setSelectedHealthGoals] = useState<string[]>([]);
   const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
@@ -87,23 +100,24 @@ const Index = () => {
     setStep('ingredients');
   };
 
-  const handleContextSelected = (contextType: string) => {
+  const handleContextSelected = (contextType: string, healthGoals?: string[]) => {
     setSelectedContext(contextType);
-    setStep('context');
+    setSelectedHealthGoals(healthGoals || []);
+    handleGenerateRecipe(extractedIngredients, contextType, healthGoals);
   };
 
-  const handleProceedToRecipe = () => {
-    handleGenerateRecipe(extractedIngredients, selectedContext);
-  };
-
-  const handleGenerateRecipe = async (ingredients: string[], contextType: string) => {
+  const handleGenerateRecipe = async (
+    ingredients: string[], 
+    contextType: string, 
+    healthGoals?: string[]
+  ) => {
     setIsGenerating(true);
     setStep('recipe');
     try {
-      // Generate recipe
+      // Generate recipe with health goals
       const { data: recipeData, error: recipeError } = await supabase.functions.invoke(
         'generate-recipe',
-        { body: { ingredients, contextType } }
+        { body: { ingredients, contextType, healthGoals } }
       );
 
       if (recipeError) throw recipeError;
@@ -191,6 +205,7 @@ const Index = () => {
     setExtractedIngredients([]);
     setIngredientImages([]);
     setSelectedContext('');
+    setSelectedHealthGoals([]);
     setGeneratedRecipe(null);
   };
 
@@ -238,21 +253,7 @@ const Index = () => {
           )}
 
           {step === 'context' && (
-            <>
-              <ContextSelection onSelectContext={handleContextSelected} />
-              {selectedContext && (
-                <div className="flex justify-center">
-                  <Button
-                    onClick={handleProceedToRecipe}
-                    disabled={isGenerating}
-                    size="lg"
-                    className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity px-12"
-                  >
-                    {isGenerating ? "Generating Recipe..." : "Generate My Recipe!"}
-                  </Button>
-                </div>
-              )}
-            </>
+            <NutritionEnhancedContextSelection onSelectContext={handleContextSelected} />
           )}
 
           {step === 'recipe' && (
