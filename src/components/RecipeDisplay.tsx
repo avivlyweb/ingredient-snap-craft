@@ -40,8 +40,8 @@ interface RecipeDisplayProps {
 
 export const RecipeDisplay = ({ recipe, onAddToGallery, isAdding }: RecipeDisplayProps) => {
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
-      <Card className="overflow-hidden bg-card shadow-lg">
+    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <Card className="overflow-hidden bg-card shadow-lg hover:shadow-xl transition-shadow duration-300">
         {recipe.image_url && (
           <div className="relative h-[400px] overflow-hidden">
             <img

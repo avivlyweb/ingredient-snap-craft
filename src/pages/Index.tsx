@@ -11,7 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { User, Session } from "@supabase/supabase-js";
+import { demoRecipe, demoIngredients, demoIngredientImages } from "@/components/DemoRecipe";
+import { Sparkles, Flame, Heart } from "lucide-react";
 
 interface Recipe {
   title: string;
@@ -209,6 +212,18 @@ const Index = () => {
     setGeneratedRecipe(null);
   };
 
+  const handleTryDemo = () => {
+    setExtractedIngredients(demoIngredients);
+    setIngredientImages(demoIngredientImages);
+    setSelectedContext('athletic_performance');
+    setSelectedHealthGoals(['muscle_building', 'heart_health', 'energy_boost']);
+    setGeneratedRecipe(demoRecipe);
+    setStep('recipe');
+    toast.success("Demo loaded! Check out the nutrition-optimized recipe 🚀", {
+      description: "Notice the detailed nutritional breakdown and health insights"
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <Navigation />
@@ -218,13 +233,48 @@ const Index = () => {
         <div className="max-w-6xl mx-auto space-y-12">
           {/* Hero Section */}
           {step === 'upload' && (
-            <div className="text-center space-y-4 mb-8">
-              <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Create a Recipe from Your Ingredients
+            <div className="text-center space-y-6 mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-full mb-4 animate-fade-in">
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                <span className="text-sm font-medium">Powered by Scientific Nutrition Data</span>
+                <Badge variant="secondary" className="text-xs">NEVO 2023</Badge>
+              </div>
+              
+              <h2 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
+                Create Nutrition-Optimized Recipes
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Upload photos of your ingredients and instantly get a unique, AI-generated recipe
+              
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-in">
+                Upload photos of your ingredients and get AI-generated recipes with detailed nutritional analysis and health insights
               </p>
+
+              <div className="flex flex-wrap justify-center gap-3 pt-4 animate-fade-in">
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium">Calorie Tracking</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
+                  <Heart className="h-4 w-4 text-rose-500" />
+                  <span className="text-sm font-medium">Health Insights</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
+                  <Sparkles className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">Nutrient Synergies</span>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Button
+                  onClick={handleTryDemo}
+                  size="lg"
+                  variant="outline"
+                  className="group hover:scale-105 transition-all hover:border-primary hover:bg-primary/5"
+                >
+                  <Sparkles className="h-4 w-4 mr-2 group-hover:animate-pulse" />
+                  Try Interactive Demo
+                  <Badge variant="secondary" className="ml-2">See it in action!</Badge>
+                </Button>
+              </div>
             </div>
           )}
 

@@ -43,7 +43,7 @@ export const HealthInsights = ({ insights, contextType }: HealthInsightsProps) =
   if (insights.length === 0) return null;
 
   return (
-    <Card className="p-6 bg-gradient-to-br from-secondary/5 to-primary/5 border-2 border-secondary/10">
+    <Card className="p-6 bg-gradient-to-br from-secondary/5 to-primary/5 border-2 border-secondary/10 animate-scale-in hover:border-secondary/20 transition-colors duration-300">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Heart className="h-5 w-5 text-rose-500" />
@@ -59,7 +59,8 @@ export const HealthInsights = ({ insights, contextType }: HealthInsightsProps) =
           {insights.map((insight, index) => (
             <div
               key={index}
-              className="flex gap-3 p-3 bg-background/60 rounded-lg hover:bg-background/80 transition-colors"
+              className="flex gap-3 p-3 bg-background/60 rounded-lg hover:bg-background/80 transition-all duration-200 hover:scale-[1.02] hover:shadow-sm"
+              style={{ animationDelay: `${index * 100}ms` }}
             >
               <Badge 
                 variant="outline" 

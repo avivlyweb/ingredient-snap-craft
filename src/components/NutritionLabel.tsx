@@ -23,7 +23,7 @@ export const NutritionLabel = ({ nutrition, servings = 4 }: NutritionLabelProps)
   ];
 
   return (
-    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-2 border-primary/10">
+    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-2 border-primary/10 animate-scale-in hover:border-primary/20 transition-colors duration-300">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold flex items-center gap-2">
