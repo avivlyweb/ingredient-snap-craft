@@ -42,7 +42,7 @@ serve(async (req) => {
     const contextInstruction = contextInstructions[contextType as keyof typeof contextInstructions] || contextInstructions.family_dinner;
     const nutritionalGoal = nutritionalGoals[contextType as keyof typeof nutritionalGoals] || nutritionalGoals.family_dinner;
 
-    const prompt = `You are a professional chef with nutrition expertise creating a personalized recipe.
+const prompt = `You are a professional chef with nutrition expertise creating a personalized recipe.
 
 Context: ${contextInstruction}
 
@@ -70,8 +70,36 @@ Return this exact structure:
   "plating_guidance": "plating instructions",
   "time_management": "timeline tips",
   "ambiance_suggestions": "mood setting tips",
-  "leftover_tips": "storage recommendations"
-}`;
+  "leftover_tips": "storage recommendations",
+  "nutrition": {
+    "calories": 600,
+    "protein": 35,
+    "carbs": 45,
+    "fat": 20,
+    "fiber": 8
+  },
+  "health_insights": [
+    {
+      "title": "Insight title",
+      "description": "Insight description",
+      "type": "benefit"
+    }
+  ]
+}
+
+NUTRITION FIELD REQUIREMENTS:
+- Calculate total nutrition for ALL servings (assume 4 servings)
+- Use realistic estimates based on ingredients
+- Calories should align with the nutritional objectives above
+- Protein, carbs, fat in grams for total recipe
+- Fiber in grams for total recipe
+
+HEALTH INSIGHTS REQUIREMENTS:
+- Provide 3-5 health insights
+- Types: "benefit" (health benefits), "synergy" (nutrient combinations), "tip" (cooking/preparation tips)
+- Focus on key nutrients in the ingredients
+- Explain specific health benefits backed by nutritional science
+- Mention nutrient preservation techniques used`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
