@@ -56,6 +56,13 @@ const Index = () => {
   const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
+  const [recipeCount, setRecipeCount] = useState(0);
+
+  // Track recipe generation count for free users
+  useEffect(() => {
+    const count = parseInt(localStorage.getItem('recipeCount') || '0');
+    setRecipeCount(count);
+  }, []);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -104,6 +111,15 @@ const Index = () => {
   };
 
   const handleContextSelected = (contextType: string, healthGoals?: string[]) => {
+    // Check if user is logged in or within free limit
+    if (!user && recipeCount >= 3) {
+      toast.error("You've reached your free recipe limit!", {
+        description: "Sign up to generate unlimited recipes"
+      });
+      navigate("/auth");
+      return;
+    }
+    
     setSelectedContext(contextType);
     setSelectedHealthGoals(healthGoals || []);
     handleGenerateRecipe(extractedIngredients, contextType, healthGoals);
@@ -149,6 +165,20 @@ const Index = () => {
 
       setGeneratedRecipe(recipe);
       setStep('recipe');
+      
+      // Increment recipe count for free users
+      if (!user) {
+        const newCount = recipeCount + 1;
+        setRecipeCount(newCount);
+        localStorage.setItem('recipeCount', newCount.toString());
+        
+        if (newCount >= 3) {
+          toast.info("This was your last free recipe!", {
+            description: "Sign up to continue generating unlimited recipes"
+          });
+        }
+      }
+      
       toast.success("Recipe generated successfully!");
     } catch (error) {
       console.error('Error generating recipe:', error);
@@ -247,6 +277,14 @@ const Index = () => {
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-in">
                 Upload photos of your ingredients and get AI-generated recipes with detailed nutritional analysis and health insights
               </p>
+              
+              {!user && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-full animate-fade-in">
+                  <span className="text-sm font-medium">
+                    🎉 {3 - recipeCount} free {3 - recipeCount === 1 ? 'recipe' : 'recipes'} remaining
+                  </span>
+                </div>
+              )}
 
               <div className="flex flex-wrap justify-center gap-3 pt-4 animate-fade-in">
                 <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
