@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { RecipeCard } from "./RecipeCard";
-import { RecipeModal } from "./RecipeModal";
-import { Loader2, Grid3x3, Images } from "lucide-react";
-import { motion } from "framer-motion";
-import { Button } from "./ui/button";
+import RecipeCard from "./RecipeCard";
+import { Loader2 } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 
 interface Recipe {
   id: string;
@@ -12,20 +10,34 @@ interface Recipe {
   description: string;
   ingredients: string[];
   steps: string;
-  cuisine_style: string;
-  serving_suggestion: string;
-  image_url?: string;
+  cuisine_style: string | null;
+  serving_suggestion?: string | null;
+  plating_guidance?: string | null;
+  time_management?: string | null;
+  ambiance_suggestions?: string | null;
+  leftover_tips?: string | null;
+  image_url?: string | null;
   created_at: string;
+  username?: string | null;
+  user_avatar?: string | null;
 }
-
-type GalleryMode = "grid" | "polaroid";
 
 export const RecipeGallery = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [mode, setMode] = useState<GalleryMode>("polaroid");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     fetchRecipes();
@@ -56,7 +68,8 @@ export const RecipeGallery = () => {
       const { data, error } = await supabase
         .from('recipes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(12);
 
       if (error) throw error;
       setRecipes(data || []);
@@ -65,11 +78,6 @@ export const RecipeGallery = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleCardClick = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setModalOpen(true);
   };
 
   if (isLoading) {
@@ -91,85 +99,14 @@ export const RecipeGallery = () => {
   }
 
   return (
-    <>
-      <div className="mb-8 flex flex-col items-center gap-6">
-        <div className="relative">
-          <div className="absolute inset-0 max-md:hidden -z-10 h-[200px] w-full bg-transparent bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-20 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"></div>
-          <p className="text-center text-xs font-light uppercase tracking-widest text-muted-foreground mb-2">
-            A Collection of Delicious Creations
-          </p>
-          <h3 className="text-center text-4xl md:text-5xl font-bold bg-gradient-to-r from-foreground via-foreground/80 to-foreground bg-clip-text text-transparent">
-            Community Recipe{" "}
-            <span className="text-primary">Gallery</span>
-          </h3>
-        </div>
-
-        <div className="flex gap-2 bg-muted p-1 rounded-lg">
-          <Button
-            variant={mode === "polaroid" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setMode("polaroid")}
-            className="gap-2"
-          >
-            <Images className="w-4 h-4" />
-            Polaroid
-          </Button>
-          <Button
-            variant={mode === "grid" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setMode("grid")}
-            className="gap-2"
-          >
-            <Grid3x3 className="w-4 h-4" />
-            Grid
-          </Button>
-        </div>
-      </div>
-
-      {mode === "polaroid" ? (
-        <div className="relative min-h-[500px] flex items-center justify-center py-12">
-          <motion.div
-            className="relative flex flex-wrap justify-center gap-8 max-w-6xl mx-auto"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              visible: {
-                transition: {
-                  staggerChildren: 0.1,
-                },
-              },
-            }}
-          >
-            {recipes.map((recipe, index) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onClick={() => handleCardClick(recipe)}
-                index={index}
-                isPolaroid={true}
-              />
-            ))}
-          </motion.div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recipes.map((recipe, index) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              onClick={() => handleCardClick(recipe)}
-              index={index}
-              isPolaroid={false}
-            />
-          ))}
-        </div>
-      )}
-
-      <RecipeModal
-        recipe={selectedRecipe}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-      />
-    </>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {recipes.map((recipe) => (
+        <RecipeCard
+          key={recipe.id}
+          recipe={recipe}
+          currentUserId={user?.id}
+        />
+      ))}
+    </div>
   );
 };

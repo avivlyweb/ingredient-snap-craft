@@ -14,9 +14,15 @@ interface Recipe {
   description: string;
   ingredients: string[];
   steps: string;
-  cuisine_style: string;
-  serving_suggestion: string;
-  image_url?: string;
+  cuisine_style?: string | null;
+  serving_suggestion?: string | null;
+  plating_guidance?: string | null;
+  time_management?: string | null;
+  ambiance_suggestions?: string | null;
+  leftover_tips?: string | null;
+  image_url?: string | null;
+  username?: string | null;
+  user_avatar?: string | null;
 }
 
 interface RecipeModalProps {

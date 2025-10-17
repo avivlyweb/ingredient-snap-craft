@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
 import { ContextSelection } from "@/components/ContextSelection";
 import { RecipeDisplay } from "@/components/RecipeDisplay";
 import { RecipeGallery } from "@/components/RecipeGallery";
 import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
+import Navigation from "@/components/Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
-import { ChefHat } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { User, Session } from "@supabase/supabase-js";
 
 interface Recipe {
   title: string;
@@ -27,6 +29,10 @@ interface Recipe {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [step, setStep] = useState<'upload' | 'ingredients' | 'context' | 'recipe'>('upload');
   const [extractedIngredients, setExtractedIngredients] = useState<string[]>([]);
   const [ingredientImages, setIngredientImages] = useState<string[]>([]);
@@ -34,6 +40,46 @@ const Index = () => {
   const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          setTimeout(() => {
+            fetchProfile(session.user.id);
+          }, 0);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username, avatar_url")
+      .eq("user_id", userId)
+      .single();
+
+    if (data) {
+      setProfile(data);
+    }
+  };
 
   const handleIngredientsExtracted = (ingredients: string[], imageUrls: string[]) => {
     setExtractedIngredients(ingredients);
@@ -96,7 +142,11 @@ const Index = () => {
   };
 
   const handleAddToGallery = async () => {
-    if (!generatedRecipe) return;
+    if (!generatedRecipe || !user) {
+      toast.error("Please sign in to save recipes");
+      navigate("/auth");
+      return;
+    }
 
     setIsAddingToGallery(true);
     try {
@@ -113,7 +163,10 @@ const Index = () => {
         plating_guidance: generatedRecipe.plating_guidance,
         time_management: generatedRecipe.time_management,
         ambiance_suggestions: generatedRecipe.ambiance_suggestions,
-        leftover_tips: generatedRecipe.leftover_tips
+        leftover_tips: generatedRecipe.leftover_tips,
+        user_id: user.id,
+        username: profile?.username || "Anonymous",
+        user_avatar: profile?.avatar_url
       });
 
       if (error) throw error;
@@ -143,27 +196,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      {/* Header */}
-      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <ChefHat className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold">Recipe Creator</h1>
-            </div>
-            {step !== 'upload' && (
-              <button
-                onClick={handleStartOver}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Start Over
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12">
@@ -177,6 +210,14 @@ const Index = () => {
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 Upload photos of your ingredients and instantly get a unique, AI-generated recipe
               </p>
+            </div>
+          )}
+
+          {step !== 'upload' && (
+            <div className="flex justify-center mb-4">
+              <Button variant="outline" onClick={handleStartOver}>
+                Start Over
+              </Button>
             </div>
           )}
 

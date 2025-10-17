@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      recipe_likes: {
+        Row: {
+          created_at: string
+          id: string
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_likes_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           ambiance_suggestions: string | null
@@ -25,6 +84,7 @@ export type Database = {
           image_url: string | null
           ingredient_images: string[] | null
           ingredients: string[]
+          is_public: boolean
           leftover_tips: string | null
           plating_guidance: string | null
           serving_suggestion: string | null
@@ -32,6 +92,9 @@ export type Database = {
           time_management: string | null
           title: string
           updated_at: string | null
+          user_avatar: string | null
+          user_id: string | null
+          username: string | null
         }
         Insert: {
           ambiance_suggestions?: string | null
@@ -43,6 +106,7 @@ export type Database = {
           image_url?: string | null
           ingredient_images?: string[] | null
           ingredients: string[]
+          is_public?: boolean
           leftover_tips?: string | null
           plating_guidance?: string | null
           serving_suggestion?: string | null
@@ -50,6 +114,9 @@ export type Database = {
           time_management?: string | null
           title: string
           updated_at?: string | null
+          user_avatar?: string | null
+          user_id?: string | null
+          username?: string | null
         }
         Update: {
           ambiance_suggestions?: string | null
@@ -61,6 +128,7 @@ export type Database = {
           image_url?: string | null
           ingredient_images?: string[] | null
           ingredients?: string[]
+          is_public?: boolean
           leftover_tips?: string | null
           plating_guidance?: string | null
           serving_suggestion?: string | null
@@ -68,6 +136,9 @@ export type Database = {
           time_management?: string | null
           title?: string
           updated_at?: string | null
+          user_avatar?: string | null
+          user_id?: string | null
+          username?: string | null
         }
         Relationships: []
       }
