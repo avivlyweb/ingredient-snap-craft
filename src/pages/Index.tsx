@@ -189,9 +189,8 @@ const Index = () => {
   };
 
   const handleAddToGallery = async () => {
-    if (!generatedRecipe || !user) {
-      toast.error("Please sign in to save recipes");
-      navigate("/auth");
+    if (!generatedRecipe) {
+      toast.error("No recipe to save");
       return;
     }
 
@@ -211,9 +210,9 @@ const Index = () => {
         time_management: generatedRecipe.time_management,
         ambiance_suggestions: generatedRecipe.ambiance_suggestions,
         leftover_tips: generatedRecipe.leftover_tips,
-        user_id: user.id,
-        username: profile?.username || "Anonymous",
-        user_avatar: profile?.avatar_url
+        user_id: user?.id || null,
+        username: profile?.username || "Anonymous Chef",
+        user_avatar: profile?.avatar_url || null
       });
 
       if (error) throw error;
