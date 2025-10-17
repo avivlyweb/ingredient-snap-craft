@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      nevo_foods: {
+        Row: {
+          alcohol_total: number | null
+          calcium: number | null
+          carbohydrate_available: number | null
+          created_at: string | null
+          energy_kcal: number | null
+          energy_kj: number | null
+          fat_total: number | null
+          fatty_acids_monounsaturated: number | null
+          fatty_acids_polyunsaturated: number | null
+          fatty_acids_saturated: number | null
+          fiber_dietary_total: number | null
+          folate: number | null
+          food_name_en: string
+          food_name_nl: string
+          id: string
+          iron: number | null
+          magnesium: number | null
+          nevo_code: string
+          phosphorus: number | null
+          potassium: number | null
+          protein_animal: number | null
+          protein_plant: number | null
+          protein_total: number | null
+          sodium: number | null
+          updated_at: string | null
+          vitamin_a: number | null
+          vitamin_b1: number | null
+          vitamin_b12: number | null
+          vitamin_b2: number | null
+          vitamin_b6: number | null
+          vitamin_c: number | null
+          vitamin_d: number | null
+          vitamin_e: number | null
+          vitamin_k: number | null
+          water_total: number | null
+          zinc: number | null
+        }
+        Insert: {
+          alcohol_total?: number | null
+          calcium?: number | null
+          carbohydrate_available?: number | null
+          created_at?: string | null
+          energy_kcal?: number | null
+          energy_kj?: number | null
+          fat_total?: number | null
+          fatty_acids_monounsaturated?: number | null
+          fatty_acids_polyunsaturated?: number | null
+          fatty_acids_saturated?: number | null
+          fiber_dietary_total?: number | null
+          folate?: number | null
+          food_name_en: string
+          food_name_nl: string
+          id?: string
+          iron?: number | null
+          magnesium?: number | null
+          nevo_code: string
+          phosphorus?: number | null
+          potassium?: number | null
+          protein_animal?: number | null
+          protein_plant?: number | null
+          protein_total?: number | null
+          sodium?: number | null
+          updated_at?: string | null
+          vitamin_a?: number | null
+          vitamin_b1?: number | null
+          vitamin_b12?: number | null
+          vitamin_b2?: number | null
+          vitamin_b6?: number | null
+          vitamin_c?: number | null
+          vitamin_d?: number | null
+          vitamin_e?: number | null
+          vitamin_k?: number | null
+          water_total?: number | null
+          zinc?: number | null
+        }
+        Update: {
+          alcohol_total?: number | null
+          calcium?: number | null
+          carbohydrate_available?: number | null
+          created_at?: string | null
+          energy_kcal?: number | null
+          energy_kj?: number | null
+          fat_total?: number | null
+          fatty_acids_monounsaturated?: number | null
+          fatty_acids_polyunsaturated?: number | null
+          fatty_acids_saturated?: number | null
+          fiber_dietary_total?: number | null
+          folate?: number | null
+          food_name_en?: string
+          food_name_nl?: string
+          id?: string
+          iron?: number | null
+          magnesium?: number | null
+          nevo_code?: string
+          phosphorus?: number | null
+          potassium?: number | null
+          protein_animal?: number | null
+          protein_plant?: number | null
+          protein_total?: number | null
+          sodium?: number | null
+          updated_at?: string | null
+          vitamin_a?: number | null
+          vitamin_b1?: number | null
+          vitamin_b12?: number | null
+          vitamin_b2?: number | null
+          vitamin_b6?: number | null
+          vitamin_c?: number | null
+          vitamin_d?: number | null
+          vitamin_e?: number | null
+          vitamin_k?: number | null
+          water_total?: number | null
+          zinc?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

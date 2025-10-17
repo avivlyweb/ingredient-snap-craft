@@ -5,6 +5,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Nutritional goals for each context type
+const nutritionalGoals: Record<string, string> = {
+  date_night: `NUTRITIONAL OBJECTIVES: Include mood-enhancing nutrients (tryptophan, magnesium, zinc), omega-3s for brain health. Target 500-700 kcal/serving, balanced macros. Avoid heavy/bloating ingredients.`,
+  family_dinner: `NUTRITIONAL OBJECTIVES: High iron, calcium, fiber, vitamin C for immune support. Target 400-600 kcal/serving, kid-friendly. Balance: 30% protein, 40% carbs, 30% healthy fats.`,
+  meal_prep: `NUTRITIONAL OBJECTIVES: Balanced macros for consistency, 25-30g protein/serving, slow-release carbs, healthy fats for satiety. Target 500-600 kcal/serving.`,
+  quick_lunch: `NUTRITIONAL OBJECTIVES: Quick proteins, complex carbs for energy, B vitamins. Target 450-550 kcal/serving, ready in 30 minutes.`,
+  entertaining: `NUTRITIONAL OBJECTIVES: Nutrient-dense sharing foods, antioxidant-rich ingredients, balanced presentation. Moderate portions for groups.`,
+  experimental: `NUTRITIONAL OBJECTIVES: Explore nutrient synergies, nutrient-preserving cooking methods, superfood combinations. Educational approach to nutrition.`
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,8 +40,19 @@ serve(async (req) => {
     };
 
     const contextInstruction = contextInstructions[contextType as keyof typeof contextInstructions] || contextInstructions.family_dinner;
+    const nutritionalGoal = nutritionalGoals[contextType as keyof typeof nutritionalGoals] || nutritionalGoals.family_dinner;
 
-    const prompt = `You are a professional chef creating a personalized recipe. Context: ${contextInstruction}
+    const prompt = `You are a professional chef with nutrition expertise creating a personalized recipe.
+
+Context: ${contextInstruction}
+
+${nutritionalGoal}
+
+NUTRITIONAL OPTIMIZATION GUIDELINES:
+- Choose cooking methods that preserve nutrients (steaming > boiling, roasting > frying)
+- Consider nutrient synergies (vitamin C helps iron absorption, healthy fats help vitamin absorption)
+- Highlight key nutritional benefits in the description
+- Ensure ingredient quantities align with nutritional objectives
 
 Generate a detailed, creative recipe using ONLY these ingredients: ${ingredients.join(', ')}.
 
