@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { IngredientCategoryPicker } from "./IngredientCategoryPicker";
+import { formatPortionWithGrams } from "@/utils/portionConverter";
 
 interface IngredientListProps {
   ingredients: string[];
@@ -44,6 +45,7 @@ export const IngredientList = ({
                   key={index} 
                   variant="secondary"
                   className="px-4 py-2 text-sm flex items-center gap-2"
+                  title={formatPortionWithGrams(ingredient)}
                 >
                   {ingredient}
                   <button
@@ -55,6 +57,9 @@ export const IngredientList = ({
                 </Badge>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              💡 Hover over ingredients to see estimated portions in grams
+            </p>
           </div>
         )}
 
