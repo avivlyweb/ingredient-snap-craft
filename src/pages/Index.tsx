@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
 import { NutritionEnhancedContextSelection } from "@/components/NutritionEnhancedContextSelection";
+import { NutritionGoalTracker } from "@/components/NutritionGoalTracker";
+import { RecipeOptimizationSuggestions } from "@/components/RecipeOptimizationSuggestions";
 import { RecipeDisplay } from "@/components/RecipeDisplay";
 import { RecipeGallery } from "@/components/RecipeGallery";
 import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
@@ -340,7 +342,25 @@ const Index = () => {
           )}
 
           {step === 'context' && (
-            <NutritionEnhancedContextSelection onSelectContext={handleContextSelected} />
+            <div className="space-y-6">
+              <NutritionGoalTracker 
+                ingredients={extractedIngredients}
+                healthGoals={selectedHealthGoals}
+                servings={4}
+              />
+              
+              <RecipeOptimizationSuggestions
+                ingredients={extractedIngredients}
+                healthGoals={selectedHealthGoals}
+                onApplySwap={(original, replacement) => {
+                  setExtractedIngredients(prev =>
+                    prev.map(ing => ing === original ? replacement : ing)
+                  );
+                }}
+              />
+              
+              <NutritionEnhancedContextSelection onSelectContext={handleContextSelected} />
+            </div>
           )}
 
           {step === 'recipe' && (
