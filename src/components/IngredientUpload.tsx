@@ -88,6 +88,10 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
     }
   };
 
+  const handleSkipToManual = () => {
+    onIngredientsExtracted([], []);
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <Card className="p-8 border-2 border-dashed border-primary/20 bg-gradient-to-br from-background to-muted/20 hover:border-primary/40 transition-colors">
@@ -149,10 +153,22 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
               Extracting Ingredients...
             </>
           ) : (
-            "Extract Ingredients"
+          "Extract Ingredients"
           )}
         </Button>
       )}
+
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground mb-3">or</p>
+        <Button
+          onClick={handleSkipToManual}
+          variant="outline"
+          size="lg"
+          className="w-full"
+        >
+          Skip & Add Ingredients Manually
+        </Button>
+      </div>
     </div>
   );
 };
