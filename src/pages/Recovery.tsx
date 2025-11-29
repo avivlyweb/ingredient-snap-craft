@@ -1,0 +1,476 @@
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Navigation from "@/components/Navigation";
+import MedicalDisclaimer from "@/components/recovery/MedicalDisclaimer";
+import RecoveryGoalCalculator from "@/components/recovery/RecoveryGoalCalculator";
+import RecoveryContextSelection from "@/components/recovery/RecoveryContextSelection";
+import BarrierTips from "@/components/recovery/BarrierTips";
+import { IngredientUpload } from "@/components/IngredientUpload";
+import { IngredientList } from "@/components/IngredientList";
+import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { NutritionLabel } from "@/components/NutritionLabel";
+import { HealthInsights } from "@/components/HealthInsights";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw } from "lucide-react";
+
+interface RecoveryGoals {
+  weight: number;
+  proteinTarget: number;
+  calorieTarget: number;
+}
+
+interface Recipe {
+  title: string;
+  description: string;
+  ingredients: string[];
+  steps: string;
+  nutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+  };
+  health_insights: Array<{
+    title: string;
+    description: string;
+    type: string;
+  }>;
+  cuisine_style?: string;
+  serving_suggestion?: string;
+  context_type?: string;
+  plating_guidance?: string;
+  time_management?: string;
+  ambiance_suggestions?: string;
+  leftover_tips?: string;
+}
+
+type RecoveryStep = "disclaimer" | "setup" | "context" | "ingredients" | "generating" | "recipe";
+
+const Recovery = () => {
+  const [currentStep, setCurrentStep] = useState<RecoveryStep>("disclaimer");
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [recoveryGoals, setRecoveryGoals] = useState<RecoveryGoals | null>(null);
+  const [selectedContext, setSelectedContext] = useState<string>("");
+  const [ingredients, setIngredients] = useState<string[]>([]);
+  const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Check if user has already accepted disclaimer
+  useEffect(() => {
+    const accepted = localStorage.getItem("recoveryDisclaimerAccepted");
+    const savedGoals = localStorage.getItem("recoveryGoals");
+    
+    if (accepted === "true") {
+      setDisclaimerAccepted(true);
+      setCurrentStep("setup");
+      
+      if (savedGoals) {
+        setRecoveryGoals(JSON.parse(savedGoals));
+      }
+    }
+  }, []);
+
+  const handleAcceptDisclaimer = () => {
+    localStorage.setItem("recoveryDisclaimerAccepted", "true");
+    setDisclaimerAccepted(true);
+    setCurrentStep("setup");
+  };
+
+  const handleGoalsCalculated = (goals: RecoveryGoals) => {
+    setRecoveryGoals(goals);
+  };
+
+  const handleContextSelect = (contextId: string) => {
+    setSelectedContext(contextId);
+  };
+
+  const handleIngredientsExtracted = (newIngredients: string[]) => {
+    setIngredients(prev => [...new Set([...prev, ...newIngredients])]);
+  };
+
+  const generateRecipe = async (ingredientList: string[]) => {
+    if (ingredientList.length === 0) {
+      toast.error("Please add at least one ingredient");
+      return;
+    }
+
+    setIngredients(ingredientList);
+    setCurrentStep("generating");
+    setIsGenerating(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-recipe", {
+        body: { 
+          ingredients: ingredientList, 
+          contextType: selectedContext,
+          recoveryGoals 
+        }
+      });
+
+      if (error) throw error;
+
+      // Ensure minimum animation time
+      await new Promise(resolve => setTimeout(resolve, 8000));
+
+      setCurrentRecipe(data.recipe);
+      setCurrentStep("recipe");
+    } catch (error) {
+      console.error("Error generating recipe:", error);
+      toast.error("Failed to generate recipe. Please try again.");
+      setCurrentStep("ingredients");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const startOver = () => {
+    setCurrentStep("setup");
+    setSelectedContext("");
+    setIngredients([]);
+    setCurrentRecipe(null);
+  };
+
+  const goBack = () => {
+    switch (currentStep) {
+      case "context":
+        setCurrentStep("setup");
+        break;
+      case "ingredients":
+        setCurrentStep("context");
+        break;
+      case "recipe":
+        setCurrentStep("ingredients");
+        break;
+    }
+  };
+
+  const proceedToContext = () => {
+    if (!recoveryGoals) {
+      toast.error("Please calculate your recovery goals first");
+      return;
+    }
+    setCurrentStep("context");
+  };
+
+  const proceedToIngredients = () => {
+    if (!selectedContext) {
+      toast.error("Please select a barrier to address");
+      return;
+    }
+    setCurrentStep("ingredients");
+  };
+
+  // Render disclaimer
+  if (!disclaimerAccepted) {
+    return <MedicalDisclaimer onAccept={handleAcceptDisclaimer} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Progress indicator */}
+        {currentStep !== "generating" && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+              <span>Recovery Progress</span>
+              <span>
+                {currentStep === "setup" && "Step 1: Set Goals"}
+                {currentStep === "context" && "Step 2: Select Challenge"}
+                {currentStep === "ingredients" && "Step 3: Add Ingredients"}
+                {currentStep === "recipe" && "Your Recipe"}
+              </span>
+            </div>
+            <Progress 
+              value={
+                currentStep === "setup" ? 25 :
+                currentStep === "context" ? 50 :
+                currentStep === "ingredients" ? 75 :
+                100
+              } 
+              className="h-2"
+            />
+          </div>
+        )}
+
+        {/* Back button */}
+        {(currentStep === "context" || currentStep === "ingredients" || currentStep === "recipe") && (
+          <Button variant="ghost" size="sm" onClick={goBack} className="mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        )}
+
+        <AnimatePresence mode="wait">
+          {/* Setup Step */}
+          {currentStep === "setup" && (
+            <motion.div
+              key="setup"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-bold">Recovery Nutrition Support</h1>
+                <p className="text-muted-foreground">
+                  Personalized recipes to support your post-operative recovery
+                </p>
+              </div>
+
+              <RecoveryGoalCalculator 
+                onGoalsCalculated={handleGoalsCalculated}
+                initialGoals={recoveryGoals}
+              />
+
+              {recoveryGoals && (
+                <div className="flex justify-center">
+                  <Button onClick={proceedToContext} size="lg">
+                    Continue to Challenge Selection
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Context Selection Step */}
+          {currentStep === "context" && (
+            <motion.div
+              key="context"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              {/* Show current goals */}
+              {recoveryGoals && (
+                <Card className="bg-muted/30">
+                  <CardContent className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Drumstick className="w-4 h-4 text-secondary" />
+                        <span className="font-medium">{recoveryGoals.proteinTarget}g protein</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Flame className="w-4 h-4 text-primary" />
+                        <span className="font-medium">{recoveryGoals.calorieTarget} kcal</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Daily targets</span>
+                  </CardContent>
+                </Card>
+              )}
+
+              <RecoveryContextSelection 
+                onSelectContext={handleContextSelect}
+                selectedContext={selectedContext}
+              />
+
+              {selectedContext && (
+                <>
+                  <BarrierTips barrierId={selectedContext} />
+                  <div className="flex justify-center">
+                    <Button onClick={proceedToIngredients} size="lg">
+                      <ChefHat className="w-4 h-4 mr-2" />
+                      Create Recipe for This Challenge
+                    </Button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* Ingredients Step */}
+          {currentStep === "ingredients" && (
+            <motion.div
+              key="ingredients"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-semibold">Add Your Ingredients</h2>
+                <p className="text-muted-foreground">
+                  Upload a photo or search from our database
+                </p>
+              </div>
+
+              <IngredientUpload onIngredientsExtracted={handleIngredientsExtracted} />
+
+              <IngredientList
+                ingredients={ingredients}
+                onGenerateRecipe={generateRecipe}
+                isGenerating={isGenerating}
+              />
+            </motion.div>
+          )}
+
+          {/* Generating Step */}
+          {currentStep === "generating" && (
+            <motion.div
+              key="generating"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <RecipeGenerationAnimation ingredients={ingredients} />
+            </motion.div>
+          )}
+
+          {/* Recipe Display Step */}
+          {currentStep === "recipe" && currentRecipe && (
+            <motion.div
+              key="recipe"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              {/* Nutrition progress toward daily goals */}
+              {recoveryGoals && (
+                <Card className="border-secondary/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">This Recipe Contributes to Your Daily Goals</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Protein</span>
+                        <span className="font-medium">
+                          {currentRecipe.nutrition.protein}g / {recoveryGoals.proteinTarget}g daily
+                        </span>
+                      </div>
+                      <Progress 
+                        value={Math.min((currentRecipe.nutrition.protein / recoveryGoals.proteinTarget) * 100, 100)} 
+                        className="h-2"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Calories</span>
+                        <span className="font-medium">
+                          {currentRecipe.nutrition.calories} / {recoveryGoals.calorieTarget} daily
+                        </span>
+                      </div>
+                      <Progress 
+                        value={Math.min((currentRecipe.nutrition.calories / recoveryGoals.calorieTarget) * 100, 100)} 
+                        className="h-2"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Custom Recipe Display for Recovery */}
+              <Card className="overflow-hidden bg-card shadow-lg">
+                <div className="p-8 space-y-6">
+                  <div className="space-y-2">
+                    <Badge className="bg-secondary text-secondary-foreground">
+                      {currentRecipe.cuisine_style || "Recovery Recipe"}
+                    </Badge>
+                    <h2 className="text-3xl font-bold">{currentRecipe.title}</h2>
+                  </div>
+
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    {currentRecipe.description}
+                  </p>
+
+                  {currentRecipe.nutrition && (
+                    <>
+                      <Separator />
+                      <NutritionLabel nutrition={currentRecipe.nutrition} servings={4} />
+                    </>
+                  )}
+
+                  {currentRecipe.health_insights && currentRecipe.health_insights.length > 0 && (
+                    <>
+                      <Separator />
+                      <HealthInsights 
+                        insights={currentRecipe.health_insights.map(i => ({
+                          ...i,
+                          type: i.type as 'benefit' | 'synergy' | 'tip'
+                        }))} 
+                        contextType={currentRecipe.context_type}
+                      />
+                    </>
+                  )}
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-xl font-semibold mb-3">Ingredients</h3>
+                    <ul className="space-y-2">
+                      {currentRecipe.ingredients.map((ingredient, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span>{ingredient}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-xl font-semibold mb-3">Instructions</h3>
+                    <div className="space-y-3 whitespace-pre-line text-muted-foreground">
+                      {currentRecipe.steps}
+                    </div>
+                  </div>
+
+                  {currentRecipe.serving_suggestion && (
+                    <>
+                      <Separator />
+                      <div className="bg-muted/50 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-2">Serving Suggestion</h3>
+                        <p className="text-muted-foreground">{currentRecipe.serving_suggestion}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {currentRecipe.time_management && (
+                    <>
+                      <Separator />
+                      <div className="bg-secondary/10 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-2">⏱️ Time Management</h3>
+                        <p className="text-muted-foreground">{currentRecipe.time_management}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {currentRecipe.leftover_tips && (
+                    <>
+                      <Separator />
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-2">♻️ Leftover Tips</h3>
+                        <p className="text-muted-foreground">{currentRecipe.leftover_tips}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+
+              <div className="flex justify-center gap-4">
+                <Button variant="outline" onClick={startOver}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Create Another Recipe
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+    </div>
+  );
+};
+
+export default Recovery;
