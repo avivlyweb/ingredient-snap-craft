@@ -17,8 +17,7 @@ import { NutritionLabel } from "@/components/NutritionLabel";
 import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Save } from "lucide-react";
-import type { User, Session } from "@supabase/supabase-js";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw } from "lucide-react";
 
 interface RecoveryGoals {
   weight: number;
@@ -56,9 +55,6 @@ interface Recipe {
 type RecoveryStep = "disclaimer" | "setup" | "context" | "ingredients" | "generating" | "recipe";
 
 const Recovery = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [currentStep, setCurrentStep] = useState<RecoveryStep>("disclaimer");
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [recoveryGoals, setRecoveryGoals] = useState<RecoveryGoals | null>(null);
@@ -66,7 +62,6 @@ const Recovery = () => {
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isAddingToGallery, setIsAddingToGallery] = useState(false);
 
   // Check if user has already accepted disclaimer
   useEffect(() => {
@@ -82,82 +77,6 @@ const Recovery = () => {
       }
     }
   }, []);
-
-  // Auth state listener
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("username, avatar_url")
-      .eq("user_id", userId)
-      .single();
-
-    if (data) {
-      setProfile(data);
-    }
-  };
-
-  const handleAddToGallery = async () => {
-    if (!currentRecipe) {
-      toast.error("No recipe to save");
-      return;
-    }
-
-    setIsAddingToGallery(true);
-    try {
-      const { error } = await supabase.from('recipes').insert({
-        title: currentRecipe.title,
-        description: currentRecipe.description,
-        ingredients: currentRecipe.ingredients,
-        steps: currentRecipe.steps,
-        cuisine_style: currentRecipe.cuisine_style,
-        serving_suggestion: currentRecipe.serving_suggestion,
-        image_url: currentRecipe.image_url,
-        context_type: currentRecipe.context_type || selectedContext,
-        plating_guidance: currentRecipe.plating_guidance,
-        time_management: currentRecipe.time_management,
-        ambiance_suggestions: currentRecipe.ambiance_suggestions,
-        leftover_tips: currentRecipe.leftover_tips,
-        user_id: user?.id || null,
-        username: profile?.username || "Recovery Chef",
-        user_avatar: profile?.avatar_url || null
-      });
-
-      if (error) throw error;
-
-      toast.success("Recipe saved to gallery!");
-    } catch (error) {
-      console.error('Error adding to gallery:', error);
-      toast.error("Failed to save recipe to gallery.");
-    } finally {
-      setIsAddingToGallery(false);
-    }
-  };
 
   const handleAcceptDisclaimer = () => {
     localStorage.setItem("recoveryDisclaimerAccepted", "true");
@@ -580,16 +499,7 @@ const Recovery = () => {
                 </div>
               </Card>
 
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button 
-                  onClick={handleAddToGallery}
-                  disabled={isAddingToGallery}
-                  size="lg"
-                  className="bg-gradient-to-r from-secondary to-accent hover:opacity-90 transition-opacity"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isAddingToGallery ? "Saving..." : "Save to Community Gallery"}
-                </Button>
+              <div className="flex justify-center gap-4">
                 <Button variant="outline" onClick={startOver}>
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Create Another Recipe
