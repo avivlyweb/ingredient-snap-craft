@@ -12,7 +12,12 @@ const nutritionalGoals: Record<string, string> = {
   meal_prep: `NUTRITIONAL OBJECTIVES: Balanced macros for consistency, 25-30g protein/serving, slow-release carbs, healthy fats for satiety. Target 500-600 kcal/serving.`,
   quick_lunch: `NUTRITIONAL OBJECTIVES: Quick proteins, complex carbs for energy, B vitamins. Target 450-550 kcal/serving, ready in 30 minutes.`,
   entertaining: `NUTRITIONAL OBJECTIVES: Nutrient-dense sharing foods, antioxidant-rich ingredients, balanced presentation. Moderate portions for groups.`,
-  experimental: `NUTRITIONAL OBJECTIVES: Explore nutrient synergies, nutrient-preserving cooking methods, superfood combinations. Educational approach to nutrition.`
+  experimental: `NUTRITIONAL OBJECTIVES: Explore nutrient synergies, nutrient-preserving cooking methods, superfood combinations. Educational approach to nutrition.`,
+  // Recovery contexts
+  nausea_support: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN (1.5g/kg body weight). Gentle, easy-to-digest foods. Cold or room temperature dishes preferred. Avoid strong aromas and greasy foods. Small portions, calorie-dense. Include ginger, citrus for stomach settling. Target 30-40g protein per meal.`,
+  low_appetite: `NUTRITIONAL OBJECTIVES: MAXIMIZE PROTEIN DENSITY (1.5g/kg body weight). Calorie-dense, nutrient-rich small portions. Fortified foods. Every bite counts. Focus on high-protein ingredients like eggs, Greek yogurt, cheese, nuts. Target 35-45g protein per meal in small volume.`,
+  energy_boost: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN with complex carbs for sustained energy. Include iron-rich foods with vitamin C for absorption. B vitamins for energy metabolism. Balanced blood sugar. Target 30-40g protein per meal.`,
+  easy_prep: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN (1.5g/kg body weight) with minimal cooking required. Simple preparation, batch-friendly. Ready-to-eat or quick-cook options. Nutrient-dense convenience. Target 30-35g protein per meal.`
 };
 
 serve(async (req) => {
@@ -30,13 +35,18 @@ serve(async (req) => {
 
     console.log('Generating recipe for ingredients:', ingredients, 'with context:', contextType);
 
-    const contextInstructions = {
+    const contextInstructions: Record<string, string> = {
       date_night: "Create a romantic, restaurant-quality dish that's impressive yet achievable. Focus on elegant presentation and intimate atmosphere. Include wine pairing suggestions.",
       family_dinner: "Design a crowd-pleasing, comforting meal with generous portions. Emphasize ease of serving and family-friendly flavors. Suggest how to make it kid-approved.",
       meal_prep: "Develop a batch-friendly recipe that stores and reheats beautifully. Focus on efficiency and how to portion for the week. Include storage tips.",
       quick_lunch: "Create a fast, energizing meal with minimal cleanup. Prioritize speed without sacrificing flavor. Suggest portable options.",
       entertaining: "Design a shareable, conversation-starting dish that's perfect for groups. Focus on impressive presentation and make-ahead elements.",
-      experimental: "Push creative boundaries with unique flavor combinations and interesting techniques. Include learning opportunities and skill-building elements."
+      experimental: "Push creative boundaries with unique flavor combinations and interesting techniques. Include learning opportunities and skill-building elements.",
+      // Recovery-specific instructions
+      nausea_support: "Create a GENTLE, easy-to-digest recipe specifically for someone experiencing nausea. CRITICAL REQUIREMENTS: Cold or room-temperature serving preferred. Minimal strong aromas. Avoid greasy, fried, or heavy foods. Small portions that are calorie and protein dense. Include soothing ingredients like ginger, bland carbs. Make it visually appealing but not overwhelming. Focus on foods that stay down easily.",
+      low_appetite: "Create a NUTRIENT-DENSE recipe for someone with very low appetite. CRITICAL REQUIREMENTS: Small portion sizes but PACKED with protein and calories. Every ingredient must count nutritionally. Include protein-rich foods like eggs, Greek yogurt, cheese, nut butters. Consider smoothie-style or easy-to-consume format. Make it appealing even when not hungry. Suggest fortification options (add protein powder, etc.).",
+      energy_boost: "Create an ENERGIZING recipe for someone experiencing fatigue during recovery. CRITICAL REQUIREMENTS: Include iron-rich foods paired with vitamin C for absorption. Complex carbohydrates for sustained energy. High protein for muscle support. B-vitamin rich ingredients. Avoid sugar spikes. Make it satisfying but not heavy.",
+      easy_prep: "Create a SIMPLE recipe requiring minimal effort for someone with limited energy. CRITICAL REQUIREMENTS: 15 minutes or less active cooking time. Few ingredients. Simple techniques. Can use pre-made components (rotisserie chicken, canned beans, pre-cut vegetables). Still high in protein and nutrients. Suggest batch cooking options."
     };
 
     const contextInstruction = contextInstructions[contextType as keyof typeof contextInstructions] || contextInstructions.family_dinner;

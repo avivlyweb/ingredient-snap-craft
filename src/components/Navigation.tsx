@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChefHat, User, LogOut, Heart } from "lucide-react";
+import { ChefHat, User, LogOut, Heart, HeartPulse } from "lucide-react";
 import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -72,6 +72,12 @@ const Navigation = () => {
         </Link>
 
         <div className="flex items-center gap-4">
+          <Link to="/recovery">
+            <Button variant="ghost" size="sm" className="text-secondary">
+              <HeartPulse className="w-4 h-4 mr-2" />
+              Recovery
+            </Button>
+          </Link>
           {user ? (
             <>
               <Link to="/my-recipes">
