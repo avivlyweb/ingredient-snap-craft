@@ -49,6 +49,7 @@ interface Recipe {
   time_management?: string;
   ambiance_suggestions?: string;
   leftover_tips?: string;
+  image_url?: string;
 }
 
 type RecoveryStep = "disclaimer" | "setup" | "context" | "ingredients" | "generating" | "recipe";
@@ -116,10 +117,28 @@ const Recovery = () => {
 
       if (error) throw error;
 
+      const recipe = data.recipe;
+
+      // Generate recipe image
+      const { data: imageData, error: imageError } = await supabase.functions.invoke(
+        'generate-recipe-image',
+        { 
+          body: { 
+            recipeTitle: recipe.title,
+            cuisineStyle: recipe.cuisine_style || "Recovery",
+            ingredients: recipe.ingredients
+          } 
+        }
+      );
+
+      if (!imageError && imageData?.imageUrl) {
+        recipe.image_url = imageData.imageUrl;
+      }
+
       // Ensure minimum animation time
       await new Promise(resolve => setTimeout(resolve, 8000));
 
-      setCurrentRecipe(data.recipe);
+      setCurrentRecipe(recipe);
       setCurrentStep("recipe");
     } catch (error) {
       console.error("Error generating recipe:", error);
@@ -372,13 +391,34 @@ const Recovery = () => {
 
               {/* Custom Recipe Display for Recovery */}
               <Card className="overflow-hidden bg-card shadow-lg">
-                <div className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <Badge className="bg-secondary text-secondary-foreground">
-                      {currentRecipe.cuisine_style || "Recovery Recipe"}
-                    </Badge>
-                    <h2 className="text-3xl font-bold">{currentRecipe.title}</h2>
+                {currentRecipe.image_url && (
+                  <div className="relative h-[300px] md:h-[400px] overflow-hidden">
+                    <img
+                      src={currentRecipe.image_url}
+                      alt={currentRecipe.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <Badge className="mb-3 bg-secondary text-secondary-foreground">
+                        {currentRecipe.cuisine_style || "Recovery Recipe"}
+                      </Badge>
+                      <h2 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+                        {currentRecipe.title}
+                      </h2>
+                    </div>
                   </div>
+                )}
+
+                <div className="p-8 space-y-6">
+                  {!currentRecipe.image_url && (
+                    <div className="space-y-2">
+                      <Badge className="bg-secondary text-secondary-foreground">
+                        {currentRecipe.cuisine_style || "Recovery Recipe"}
+                      </Badge>
+                      <h2 className="text-3xl font-bold">{currentRecipe.title}</h2>
+                    </div>
+                  )}
 
                   <p className="text-lg text-muted-foreground leading-relaxed">
                     {currentRecipe.description}
