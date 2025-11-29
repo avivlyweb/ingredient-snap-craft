@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.import-nevo-data]
 verify_jwt = false
+
+[functions.search-nevo-ingredients]
+verify_jwt = false
+
+[functions.optimize-recipe-nutrition]
+verify_jwt = false
