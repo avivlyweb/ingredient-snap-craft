@@ -17,7 +17,8 @@ import { NutritionLabel } from "@/components/NutritionLabel";
 import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2 } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 
 interface RecoveryGoals {
   weight: number;
@@ -54,6 +55,11 @@ interface Recipe {
 
 type RecoveryStep = "disclaimer" | "setup" | "context" | "ingredients" | "generating" | "recipe";
 
+interface Profile {
+  username: string;
+  avatar_url: string | null;
+}
+
 const Recovery = () => {
   const [currentStep, setCurrentStep] = useState<RecoveryStep>("disclaimer");
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -62,6 +68,41 @@ const Recovery = () => {
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [currentRecipe, setCurrentRecipe] = useState<Recipe | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAddingToGallery, setIsAddingToGallery] = useState(false);
+  const [addedToGallery, setAddedToGallery] = useState(false);
+
+  // Get user session and profile
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('user_id', userId)
+      .single();
+    
+    if (data) {
+      setProfile(data);
+    }
+  };
 
   // Check if user has already accepted disclaimer
   useEffect(() => {
@@ -154,6 +195,42 @@ const Recovery = () => {
     setSelectedContext("");
     setIngredients([]);
     setCurrentRecipe(null);
+    setAddedToGallery(false);
+  };
+
+  const handleAddToGallery = async () => {
+    if (!currentRecipe) return;
+    
+    setIsAddingToGallery(true);
+    try {
+      const { error } = await supabase.from('recipes').insert({
+        title: currentRecipe.title,
+        description: currentRecipe.description,
+        ingredients: currentRecipe.ingredients,
+        steps: currentRecipe.steps,
+        cuisine_style: currentRecipe.cuisine_style || "Recovery Recipe",
+        serving_suggestion: currentRecipe.serving_suggestion,
+        image_url: currentRecipe.image_url,
+        context_type: selectedContext,
+        plating_guidance: currentRecipe.plating_guidance,
+        time_management: currentRecipe.time_management,
+        ambiance_suggestions: currentRecipe.ambiance_suggestions,
+        leftover_tips: currentRecipe.leftover_tips,
+        user_id: user?.id || null,
+        username: profile?.username || "Recovery Chef",
+        user_avatar: profile?.avatar_url || null
+      });
+
+      if (error) throw error;
+
+      setAddedToGallery(true);
+      toast.success("Recipe added to Community Gallery!");
+    } catch (error) {
+      console.error('Error adding to gallery:', error);
+      toast.error("Failed to add recipe to gallery.");
+    } finally {
+      setIsAddingToGallery(false);
+    }
   };
 
   const goBack = () => {
@@ -503,6 +580,27 @@ const Recovery = () => {
                 <Button variant="outline" onClick={startOver}>
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Create Another Recipe
+                </Button>
+                <Button 
+                  onClick={handleAddToGallery} 
+                  disabled={isAddingToGallery || addedToGallery}
+                >
+                  {isAddingToGallery ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : addedToGallery ? (
+                    <>
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Added to Gallery
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share to Gallery
+                    </>
+                  )}
                 </Button>
               </div>
             </motion.div>
