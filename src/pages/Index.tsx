@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import type { User, Session } from "@supabase/supabase-js";
 import { demoRecipe, demoIngredients, demoIngredientImages } from "@/components/DemoRecipe";
 import { Sparkles, Flame, Heart } from "lucide-react";
-
 interface Recipe {
   title: string;
   description: string;
@@ -44,12 +43,14 @@ interface Recipe {
     type: 'benefit' | 'synergy' | 'tip';
   }>;
 }
-
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
+  const [profile, setProfile] = useState<{
+    username: string;
+    avatar_url: string | null;
+  } | null>(null);
   const [step, setStep] = useState<'upload' | 'ingredients' | 'context' | 'recipe'>('upload');
   const [extractedIngredients, setExtractedIngredients] = useState<string[]>([]);
   const [ingredientImages, setIngredientImages] = useState<string[]>([]);
@@ -65,53 +66,49 @@ const Index = () => {
     const count = parseInt(localStorage.getItem('recipeCount') || '0');
     setRecipeCount(count);
   }, []);
-
   useEffect(() => {
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
-        }
+    const {
+      data: {
+        subscription
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+      if (session?.user) {
+        setTimeout(() => {
+          fetchProfile(session.user.id);
+        }, 0);
+      }
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({
+      data: {
+        session
+      }
+    }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
-
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("username, avatar_url")
-      .eq("user_id", userId)
-      .single();
-
+    const {
+      data
+    } = await supabase.from("profiles").select("username, avatar_url").eq("user_id", userId).single();
     if (data) {
       setProfile(data);
     }
   };
-
   const handleIngredientsExtracted = (ingredients: string[], imageUrls: string[]) => {
     setExtractedIngredients(ingredients);
     setIngredientImages(imageUrls);
     setStep('ingredients');
   };
-
   const handleContextSelected = (contextType: string, healthGoals?: string[]) => {
     // Check if user is logged in or within free limit
     if (!user && recipeCount >= 3) {
@@ -121,66 +118,60 @@ const Index = () => {
       navigate("/auth");
       return;
     }
-    
     setSelectedContext(contextType);
     setSelectedHealthGoals(healthGoals || []);
     handleGenerateRecipe(extractedIngredients, contextType, healthGoals);
   };
-
-  const handleGenerateRecipe = async (
-    ingredients: string[], 
-    contextType: string, 
-    healthGoals?: string[]
-  ) => {
+  const handleGenerateRecipe = async (ingredients: string[], contextType: string, healthGoals?: string[]) => {
     setIsGenerating(true);
     setStep('recipe');
     try {
       // Generate recipe with health goals
-      const { data: recipeData, error: recipeError } = await supabase.functions.invoke(
-        'generate-recipe',
-        { body: { ingredients, contextType, healthGoals } }
-      );
-
+      const {
+        data: recipeData,
+        error: recipeError
+      } = await supabase.functions.invoke('generate-recipe', {
+        body: {
+          ingredients,
+          contextType,
+          healthGoals
+        }
+      });
       if (recipeError) throw recipeError;
       if (recipeData?.error) {
         toast.error(recipeData.error);
         return;
       }
-
       const recipe = recipeData.recipe;
 
       // Generate recipe image
-      const { data: imageData, error: imageError } = await supabase.functions.invoke(
-        'generate-recipe-image',
-        { 
-          body: { 
-            recipeTitle: recipe.title,
-            cuisineStyle: recipe.cuisine_style,
-            ingredients: recipe.ingredients
-          } 
+      const {
+        data: imageData,
+        error: imageError
+      } = await supabase.functions.invoke('generate-recipe-image', {
+        body: {
+          recipeTitle: recipe.title,
+          cuisineStyle: recipe.cuisine_style,
+          ingredients: recipe.ingredients
         }
-      );
-
+      });
       if (!imageError && imageData?.imageUrl) {
         recipe.image_url = imageData.imageUrl;
       }
-
       setGeneratedRecipe(recipe);
       setStep('recipe');
-      
+
       // Increment recipe count for free users
       if (!user) {
         const newCount = recipeCount + 1;
         setRecipeCount(newCount);
         localStorage.setItem('recipeCount', newCount.toString());
-        
         if (newCount >= 3) {
           toast.info("This was your last free recipe!", {
             description: "Sign up to continue generating unlimited recipes"
           });
         }
       }
-      
       toast.success("Recipe generated successfully!");
     } catch (error) {
       console.error('Error generating recipe:', error);
@@ -189,16 +180,16 @@ const Index = () => {
       setIsGenerating(false);
     }
   };
-
   const handleAddToGallery = async () => {
     if (!generatedRecipe) {
       toast.error("No recipe to save");
       return;
     }
-
     setIsAddingToGallery(true);
     try {
-      const { error } = await supabase.from('recipes').insert({
+      const {
+        error
+      } = await supabase.from('recipes').insert({
         title: generatedRecipe.title,
         description: generatedRecipe.description,
         ingredients: generatedRecipe.ingredients,
@@ -216,11 +207,9 @@ const Index = () => {
         username: profile?.username || "Anonymous Chef",
         user_avatar: profile?.avatar_url || null
       });
-
       if (error) throw error;
-
       toast.success("Recipe added to gallery!");
-      
+
       // Reset to start
       setStep('upload');
       setExtractedIngredients([]);
@@ -233,7 +222,6 @@ const Index = () => {
       setIsAddingToGallery(false);
     }
   };
-
   const handleStartOver = () => {
     setStep('upload');
     setExtractedIngredients([]);
@@ -242,7 +230,6 @@ const Index = () => {
     setSelectedHealthGoals([]);
     setGeneratedRecipe(null);
   };
-
   const handleTryDemo = () => {
     setExtractedIngredients(demoIngredients);
     setIngredientImages(demoIngredientImages);
@@ -254,21 +241,19 @@ const Index = () => {
       description: "Notice the detailed nutritional breakdown and health insights"
     });
   };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+  return <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <Navigation />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto space-y-12">
           {/* Hero Section */}
-          {step === 'upload' && (
-            <div className="text-center space-y-6 mb-8">
+          {step === 'upload' && <div className="text-center space-y-6 mb-8">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-full mb-4 animate-fade-in">
                 <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                 <span className="text-sm font-medium">Powered by Scientific Nutrition Data</span>
-                <Badge variant="secondary" className="text-xs">NEVO 2023</Badge>
+                <Badge variant="secondary" className="text-xs">​2025
+ </Badge>
               </div>
               
               <h2 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
@@ -279,13 +264,11 @@ const Index = () => {
                 Upload photos of your ingredients and get AI-generated recipes with detailed nutritional analysis and health insights
               </p>
               
-              {!user && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-full animate-fade-in">
+              {!user && <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-full animate-fade-in">
                   <span className="text-sm font-medium">
                     🎉 {3 - recipeCount} free {3 - recipeCount === 1 ? 'recipe' : 'recipes'} remaining
                   </span>
-                </div>
-              )}
+                </div>}
 
               <div className="flex flex-wrap justify-center gap-3 pt-4 animate-fade-in">
                 <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
@@ -303,79 +286,41 @@ const Index = () => {
               </div>
 
               <div className="pt-6">
-                <Button
-                  onClick={handleTryDemo}
-                  size="lg"
-                  variant="outline"
-                  className="group hover:scale-105 transition-all hover:border-primary hover:bg-primary/5"
-                >
+                <Button onClick={handleTryDemo} size="lg" variant="outline" className="group hover:scale-105 transition-all hover:border-primary hover:bg-primary/5">
                   <Sparkles className="h-4 w-4 mr-2 group-hover:animate-pulse" />
                   Try Interactive Demo
                   <Badge variant="secondary" className="ml-2">See it in action!</Badge>
                 </Button>
               </div>
-            </div>
-          )}
+            </div>}
 
-          {step !== 'upload' && (
-            <div className="flex justify-center mb-4">
+          {step !== 'upload' && <div className="flex justify-center mb-4">
               <Button variant="outline" onClick={handleStartOver}>
                 Start Over
               </Button>
-            </div>
-          )}
+            </div>}
 
           {/* Step Content */}
-          {step === 'upload' && (
-            <IngredientUpload onIngredientsExtracted={handleIngredientsExtracted} />
-          )}
+          {step === 'upload' && <IngredientUpload onIngredientsExtracted={handleIngredientsExtracted} />}
 
-          {step === 'ingredients' && (
-            <IngredientList
-              ingredients={extractedIngredients}
-              onGenerateRecipe={(ingredients) => {
-                setExtractedIngredients(ingredients);
-                setStep('context');
-              }}
-              isGenerating={false}
-            />
-          )}
+          {step === 'ingredients' && <IngredientList ingredients={extractedIngredients} onGenerateRecipe={ingredients => {
+          setExtractedIngredients(ingredients);
+          setStep('context');
+        }} isGenerating={false} />}
 
-          {step === 'context' && (
-            <div className="space-y-6">
-              <NutritionGoalTracker 
-                ingredients={extractedIngredients}
-                healthGoals={selectedHealthGoals}
-                servings={4}
-              />
+          {step === 'context' && <div className="space-y-6">
+              <NutritionGoalTracker ingredients={extractedIngredients} healthGoals={selectedHealthGoals} servings={4} />
               
-              <RecipeOptimizationSuggestions
-                ingredients={extractedIngredients}
-                healthGoals={selectedHealthGoals}
-                onApplySwap={(original, replacement) => {
-                  setExtractedIngredients(prev =>
-                    prev.map(ing => ing === original ? replacement : ing)
-                  );
-                }}
-              />
+              <RecipeOptimizationSuggestions ingredients={extractedIngredients} healthGoals={selectedHealthGoals} onApplySwap={(original, replacement) => {
+            setExtractedIngredients(prev => prev.map(ing => ing === original ? replacement : ing));
+          }} />
               
               <NutritionEnhancedContextSelection onSelectContext={handleContextSelected} />
-            </div>
-          )}
+            </div>}
 
-          {step === 'recipe' && (
-            <>
-              {isGenerating ? (
-                <RecipeGenerationAnimation ingredients={extractedIngredients} />
-              ) : generatedRecipe ? (
-                <RecipeDisplay
-                  recipe={generatedRecipe}
-                  onAddToGallery={handleAddToGallery}
-                  isAdding={isAddingToGallery}
-                />
-              ) : null}
-            </>
-          )}
+          {step === 'recipe' && <>
+              {isGenerating ? <RecipeGenerationAnimation ingredients={extractedIngredients} /> : generatedRecipe ? <RecipeDisplay recipe={generatedRecipe} onAddToGallery={handleAddToGallery} isAdding={isAddingToGallery} /> : null}
+            </>}
 
           {/* Community Gallery */}
           <div className="pt-12">
@@ -390,8 +335,6 @@ const Index = () => {
           </div>
         </div>
       </main>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
