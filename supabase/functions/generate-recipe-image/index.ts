@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +14,15 @@ serve(async (req) => {
   try {
     const { recipeTitle, cuisineStyle, ingredients } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase credentials not configured");
     }
 
     console.log('Generating recipe image for:', recipeTitle);
@@ -29,7 +36,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.5-flash-image",
         messages: [
           {
             role: "user",
@@ -61,13 +68,45 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const base64ImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
-    if (!imageUrl) {
+    if (!base64ImageUrl) {
       throw new Error("No image generated");
     }
 
-    console.log('Generated recipe image successfully');
+    // Extract base64 data and upload to storage
+    const base64Data = base64ImageUrl.replace(/^data:image\/\w+;base64,/, '');
+    const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    
+    // Create Supabase client with service role
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = crypto.randomUUID().slice(0, 8);
+    const fileName = `recipe-${timestamp}-${randomId}.png`;
+    
+    // Upload to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('recipe-images')
+      .upload(fileName, imageBytes, {
+        contentType: 'image/png',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('recipe-images')
+      .getPublicUrl(fileName);
+
+    const imageUrl = publicUrlData.publicUrl;
+    
+    console.log('Generated and uploaded recipe image successfully:', fileName);
 
     return new Response(
       JSON.stringify({ imageUrl }),
