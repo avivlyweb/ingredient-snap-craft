@@ -54,6 +54,17 @@ const barrierTipsData: Record<string, {
       { icon: <Heart className="w-4 h-4" />, text: "No-cook options: sandwiches, cheese and crackers, yogurt parfaits" },
     ],
     foodSuggestions: ["Rotisserie chicken", "Pre-washed salads", "Canned beans", "Frozen vegetables", "Cottage cheese", "Deli meats", "Hummus", "Pre-made soups"]
+  },
+  cancer_support: {
+    title: "Cancer & Surgical Recovery Nutrition",
+    description: "Safe, healing-focused nutrition during treatment and recovery",
+    tips: [
+      { icon: <Heart className="w-4 h-4" />, text: "Food safety first: cook foods thoroughly (cooked > raw) to protect low immunity" },
+      { icon: <Utensils className="w-4 h-4" />, text: "Focus on wound healing nutrients: protein (1.5g/kg), zinc, and vitamin C" },
+      { icon: <Lightbulb className="w-4 h-4" />, text: "Manage mucositis: soft, moist foods at room temperature; avoid acidic/spicy items" },
+      { icon: <Clock className="w-4 h-4" />, text: "Immunonutrition: include Arginine & Omega-3 rich foods (salmon, nuts, eggs)" },
+    ],
+    foodSuggestions: ["Bone broth", "Cooked salmon", "Greek yogurt", "Eggs", "Cooked vegetables", "Fortified cereals", "Soft fruits", "Lean poultry"]
   }
 };
 

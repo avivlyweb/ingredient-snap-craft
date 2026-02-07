@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Frown, Utensils, Zap, Clock } from "lucide-react";
+import { Frown, Utensils, Zap, Clock, Shield } from "lucide-react";
 
 interface RecoveryContext {
   id: string;
@@ -67,6 +67,19 @@ const recoveryContexts: RecoveryContext[] = [
       "Keep nutritious ready-to-eat options available",
       "Accept help from family and friends",
       "Prioritize rest—nutrition supports healing"
+    ]
+  },
+  {
+    id: "cancer_support",
+    label: "Cancer & Surgical Care",
+    description: "Safe nutrition for wound healing and immune support",
+    icon: <Shield className="w-6 h-6" />,
+    color: "text-rose-500",
+    tips: [
+      "Prioritize food safety (cooked > raw) for low immunity",
+      "Focus on protein & zinc for surgical wound healing",
+      "Manage side effects like mucositis or taste changes",
+      "Immunonutrition with Arginine & Omega-3s supports recovery"
     ]
   }
 ];

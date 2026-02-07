@@ -5,6 +5,7 @@ import MedicalDisclaimer from "@/components/recovery/MedicalDisclaimer";
 import RecoveryGoalCalculator from "@/components/recovery/RecoveryGoalCalculator";
 import RecoveryContextSelection from "@/components/recovery/RecoveryContextSelection";
 import BarrierTips from "@/components/recovery/BarrierTips";
+import ClinicalRationale from "@/components/recovery/ClinicalRationale";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
 import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
@@ -13,17 +14,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { NutritionLabel } from "@/components/NutritionLabel";
 import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2 } from "lucide-react";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 interface RecoveryGoals {
   weight: number;
   proteinTarget: number;
   calorieTarget: number;
+}
+
+interface ClinicalRationaleItem {
+  topic: string;
+  mechanism: string;
+  evidence_grade: string;
 }
 
 interface Recipe {
@@ -43,6 +52,8 @@ interface Recipe {
     description: string;
     type: string;
   }>;
+  patient_tips?: string[];
+  clinical_rationale?: ClinicalRationaleItem[];
   cuisine_style?: string;
   serving_suggestion?: string;
   context_type?: string;
@@ -72,6 +83,14 @@ const Recovery = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
   const [addedToGallery, setAddedToGallery] = useState(false);
+  const [isClinicianMode, setIsClinicianMode] = useState(() => {
+    return localStorage.getItem("recoveryClinicianMode") === "true";
+  });
+
+  // Persist clinician mode preference
+  useEffect(() => {
+    localStorage.setItem("recoveryClinicianMode", isClinicianMode.toString());
+  }, [isClinicianMode]);
 
   // Get user session and profile
   useEffect(() => {
@@ -271,6 +290,23 @@ const Recovery = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
+      
+      {/* Clinician Mode Toggle */}
+      <div className="container mx-auto px-4 pt-4 max-w-4xl">
+        <div className="flex items-center justify-end gap-3 p-3 bg-muted/30 rounded-lg border">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Stethoscope className="w-4 h-4" />
+            <Label htmlFor="clinician-mode" className="cursor-pointer font-medium">
+              Clinician View
+            </Label>
+          </div>
+          <Switch
+            id="clinician-mode"
+            checked={isClinicianMode}
+            onCheckedChange={setIsClinicianMode}
+          />
+        </div>
+      </div>
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Progress indicator */}
@@ -505,6 +541,37 @@ const Recovery = () => {
                     <>
                       <Separator />
                       <NutritionLabel nutrition={currentRecipe.nutrition} servings={4} />
+                    </>
+                  )}
+
+                  {/* Patient Tips - shown to everyone */}
+                  {currentRecipe.patient_tips && currentRecipe.patient_tips.length > 0 && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          💡 Recovery Tips
+                        </h3>
+                        <ul className="space-y-2">
+                          {currentRecipe.patient_tips.map((tip, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <span className="text-secondary mt-0.5">✓</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Clinical Rationale - only shown in clinician mode */}
+                  {isClinicianMode && currentRecipe.clinical_rationale && currentRecipe.clinical_rationale.length > 0 && (
+                    <>
+                      <Separator />
+                      <ClinicalRationale 
+                        rationale={currentRecipe.clinical_rationale} 
+                        recipeTitle={currentRecipe.title} 
+                      />
                     </>
                   )}
 

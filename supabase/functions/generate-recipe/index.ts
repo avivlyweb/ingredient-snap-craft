@@ -17,7 +17,8 @@ const nutritionalGoals: Record<string, string> = {
   nausea_support: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN (1.5g/kg body weight). Gentle, easy-to-digest foods. Cold or room temperature dishes preferred. Avoid strong aromas and greasy foods. Small portions, calorie-dense. Include ginger, citrus for stomach settling. Target 30-40g protein per meal.`,
   low_appetite: `NUTRITIONAL OBJECTIVES: MAXIMIZE PROTEIN DENSITY (1.5g/kg body weight). Calorie-dense, nutrient-rich small portions. Fortified foods. Every bite counts. Focus on high-protein ingredients like eggs, Greek yogurt, cheese, nuts. Target 35-45g protein per meal in small volume.`,
   energy_boost: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN with complex carbs for sustained energy. Include iron-rich foods with vitamin C for absorption. B vitamins for energy metabolism. Balanced blood sugar. Target 30-40g protein per meal.`,
-  easy_prep: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN (1.5g/kg body weight) with minimal cooking required. Simple preparation, batch-friendly. Ready-to-eat or quick-cook options. Nutrient-dense convenience. Target 30-35g protein per meal.`
+  easy_prep: `NUTRITIONAL OBJECTIVES: HIGH PROTEIN (1.5g/kg body weight) with minimal cooking required. Simple preparation, batch-friendly. Ready-to-eat or quick-cook options. Nutrient-dense convenience. Target 30-35g protein per meal.`,
+  cancer_support: `NUTRITIONAL OBJECTIVES: STRICT PROTEIN TARGET (1.5g/kg body weight per ERAS/ESPEN guidelines). FOOD SAFETY is critical for immunocompromised patients - all foods must be thoroughly cooked (cooked > raw). Focus on wound healing nutrients: protein, zinc, vitamin C, and collagen-supporting amino acids (Glutamine, Arginine). Include immunonutrition: Arginine-rich foods (eggs, nuts, seeds) and Omega-3s (fatty fish, walnuts). Manage treatment side effects: soft textures for mucositis, mild flavors for taste changes, avoid acidic/spicy foods. Target 35-45g protein per meal.`
 };
 
 serve(async (req) => {
@@ -46,13 +47,17 @@ serve(async (req) => {
       nausea_support: "Create a GENTLE, easy-to-digest recipe specifically for someone experiencing nausea. CRITICAL REQUIREMENTS: Cold or room-temperature serving preferred. Minimal strong aromas. Avoid greasy, fried, or heavy foods. Small portions that are calorie and protein dense. Include soothing ingredients like ginger, bland carbs. Make it visually appealing but not overwhelming. Focus on foods that stay down easily.",
       low_appetite: "Create a NUTRIENT-DENSE recipe for someone with very low appetite. CRITICAL REQUIREMENTS: Small portion sizes but PACKED with protein and calories. Every ingredient must count nutritionally. Include protein-rich foods like eggs, Greek yogurt, cheese, nut butters. Consider smoothie-style or easy-to-consume format. Make it appealing even when not hungry. Suggest fortification options (add protein powder, etc.).",
       energy_boost: "Create an ENERGIZING recipe for someone experiencing fatigue during recovery. CRITICAL REQUIREMENTS: Include iron-rich foods paired with vitamin C for absorption. Complex carbohydrates for sustained energy. High protein for muscle support. B-vitamin rich ingredients. Avoid sugar spikes. Make it satisfying but not heavy.",
-      easy_prep: "Create a SIMPLE recipe requiring minimal effort for someone with limited energy. CRITICAL REQUIREMENTS: 15 minutes or less active cooking time. Few ingredients. Simple techniques. Can use pre-made components (rotisserie chicken, canned beans, pre-cut vegetables). Still high in protein and nutrients. Suggest batch cooking options."
+      easy_prep: "Create a SIMPLE recipe requiring minimal effort for someone with limited energy. CRITICAL REQUIREMENTS: 15 minutes or less active cooking time. Few ingredients. Simple techniques. Can use pre-made components (rotisserie chicken, canned beans, pre-cut vegetables). Still high in protein and nutrients. Suggest batch cooking options.",
+      cancer_support: "You are the 'ZorgAssistent' AI, an Evidence-Based Clinical Nutritionist specializing in Dutch Post-Operative Recovery following ERAS/ESPEN guidelines. Create a SAFE, HEALING-FOCUSED recipe for cancer/surgical recovery patients. CRITICAL REQUIREMENTS: FOOD SAFETY - All ingredients must be thoroughly cooked (no raw foods, cooked > raw) for immunocompromised patients. WOUND HEALING - Prioritize protein (1.5g/kg target), zinc, vitamin C, and collagen-supporting amino acids (Glutamine, Arginine). IMMUNONUTRITION - Include Arginine-rich foods (eggs, poultry, nuts) and Omega-3 sources (cooked salmon, walnuts). SYMPTOM MANAGEMENT - Soft textures for mucositis, mild flavors for taste changes, avoid acidic/spicy foods. Make it appetizing despite treatment side effects."
     };
 
     const contextInstruction = contextInstructions[contextType as keyof typeof contextInstructions] || contextInstructions.family_dinner;
     const nutritionalGoal = nutritionalGoals[contextType as keyof typeof nutritionalGoals] || nutritionalGoals.family_dinner;
+    
+    // Check if this is a recovery context that needs dual-layer output
+    const isRecoveryContext = ['nausea_support', 'low_appetite', 'energy_boost', 'easy_prep', 'cancer_support'].includes(contextType);
 
-const prompt = `You are a professional chef with nutrition expertise creating a personalized recipe.
+const prompt = `You are ${isRecoveryContext ? "the 'ZorgAssistent' AI, an Evidence-Based Clinical Nutritionist specializing in Dutch Post-Operative Recovery. You follow ERAS (Enhanced Recovery After Surgery) and ESPEN (European Society for Clinical Nutrition and Metabolism) guidelines" : "a professional chef with nutrition expertise"} creating a personalized recipe.
 
 Context: ${contextInstruction}
 
@@ -63,6 +68,13 @@ NUTRITIONAL OPTIMIZATION GUIDELINES:
 - Consider nutrient synergies (vitamin C helps iron absorption, healthy fats help vitamin absorption)
 - Highlight key nutritional benefits in the description
 - Ensure ingredient quantities align with nutritional objectives
+${isRecoveryContext ? `
+EVIDENCE-BASED PRACTICE RULES (ZorgAssistent Protocols):
+- Protein Targets: Strictly adhere to 1.5g/kg target for post-operative recovery (Ref: ESPEN guidelines for surgical patients)
+- Data Source: Prioritize NEVO 2023 (v8.0) nutritional values where possible
+- For cancer_support context: Apply immunonutrition principles, prioritize Arginine/Omega-3s as per ERAS protocols
+- Generate DUAL-LAYER INSIGHTS for both patients and clinicians
+` : ''}
 
 Generate a detailed, creative recipe using ONLY these ingredients: ${ingredients.join(', ')}.
 
@@ -94,7 +106,18 @@ Return this exact structure:
       "description": "Insight description",
       "type": "benefit"
     }
-  ]
+  ]${isRecoveryContext ? `,
+  "patient_tips": [
+    "Encouraging, clear tip for the patient about this recipe",
+    "Another motivating health tip written in friendly language"
+  ],
+  "clinical_rationale": [
+    {
+      "topic": "Topic name (e.g., Wound Healing, Food Safety, Immunonutrition)",
+      "mechanism": "Technical explanation of the nutritional mechanism for clinicians",
+      "evidence_grade": "Grade A (Systematic Review), Grade B (Clinical Consensus), or Grade C (Expert Opinion)"
+    }
+  ]` : ''}
 }
 
 NUTRITION FIELD REQUIREMENTS:
@@ -109,7 +132,22 @@ HEALTH INSIGHTS REQUIREMENTS:
 - Types: "benefit" (health benefits), "synergy" (nutrient combinations), "tip" (cooking/preparation tips)
 - Focus on key nutrients in the ingredients
 - Explain specific health benefits backed by nutritional science
-- Mention nutrient preservation techniques used`;
+- Mention nutrient preservation techniques used
+${isRecoveryContext ? `
+PATIENT TIPS REQUIREMENTS (patient_tips array):
+- Provide 3-5 encouraging, clear tips for the patient
+- Use friendly, motivating language (ZorgAssistent PatientVoice style)
+- Focus on why this recipe helps their recovery
+- Include practical eating/serving suggestions
+- Dutch-localized tips if appropriate
+
+CLINICAL RATIONALE REQUIREMENTS (clinical_rationale array):
+- Provide 2-4 clinical rationale items for healthcare professionals
+- Topics should cover: wound healing, food safety, immunonutrition, symptom management as relevant
+- Mechanism should explain the nutritional science (amino acids, nutrient functions, etc.)
+- Evidence grades: Grade A (systematic reviews/RCTs), Grade B (clinical consensus/guidelines), Grade C (expert opinion)
+- Reference ERAS/ESPEN guidelines where applicable
+` : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
