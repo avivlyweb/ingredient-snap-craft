@@ -65,10 +65,10 @@ export const RecipeGallery = () => {
 
   const fetchRecipes = async () => {
     try {
-      // Select specific columns to avoid fetching large base64 image data that causes timeout
+      // Fetch recipes including image_url (now properly stored as URLs, not base64)
       const { data, error } = await supabase
         .from('recipes')
-        .select('id, title, description, ingredients, steps, cuisine_style, serving_suggestion, plating_guidance, time_management, ambiance_suggestions, leftover_tips, created_at, username, user_avatar')
+        .select('id, title, description, ingredients, steps, cuisine_style, serving_suggestion, plating_guidance, time_management, ambiance_suggestions, leftover_tips, image_url, created_at, username, user_avatar')
         .order('created_at', { ascending: false })
         .limit(12);
 

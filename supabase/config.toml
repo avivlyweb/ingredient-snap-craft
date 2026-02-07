@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.optimize-recipe-nutrition]
 verify_jwt = false
+
+[functions.migrate-recipe-images]
+verify_jwt = false
