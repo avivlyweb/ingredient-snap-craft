@@ -6,6 +6,8 @@ import RecoveryGoalCalculator from "@/components/recovery/RecoveryGoalCalculator
 import RecoveryContextSelection from "@/components/recovery/RecoveryContextSelection";
 import BarrierTips from "@/components/recovery/BarrierTips";
 import ClinicalRationale from "@/components/recovery/ClinicalRationale";
+import { ClinicianDashboard } from "@/components/recovery/ClinicianDashboard";
+import { VoiceButton } from "@/components/voice/VoiceButton";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
 import { RecipeGenerationAnimation } from "@/components/RecipeGenerationAnimation";
@@ -673,7 +675,32 @@ const Recovery = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Clinician Dashboard - only in clinician mode */}
+        {isClinicianMode && recoveryGoals && currentStep !== "generating" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8"
+          >
+            <ClinicianDashboard 
+              proteinTarget={recoveryGoals.proteinTarget}
+              calorieTarget={recoveryGoals.calorieTarget}
+            />
+          </motion.div>
+        )}
       </main>
+
+      {/* Voice Button - floating action button */}
+      {disclaimerAccepted && (
+        <VoiceButton
+          recoveryContext={{
+            contextType: selectedContext,
+            proteinTarget: recoveryGoals?.proteinTarget,
+            calorieTarget: recoveryGoals?.calorieTarget,
+          }}
+        />
+      )}
     </div>
   );
 };
