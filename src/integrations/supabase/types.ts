@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          activity_type: string
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          intensity: string | null
+          logged_via: string
+          notes: string | null
+          transcript: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          intensity?: string | null
+          logged_via?: string
+          notes?: string | null
+          transcript?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          intensity?: string | null
+          logged_via?: string
+          notes?: string | null
+          transcript?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      food_logs: {
+        Row: {
+          created_at: string
+          estimated_calories: number | null
+          estimated_protein: number | null
+          id: string
+          items: string[]
+          logged_via: string
+          meal_type: string | null
+          transcript: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_calories?: number | null
+          estimated_protein?: number | null
+          id?: string
+          items?: string[]
+          logged_via?: string
+          meal_type?: string | null
+          transcript?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_calories?: number | null
+          estimated_protein?: number | null
+          id?: string
+          items?: string[]
+          logged_via?: string
+          meal_type?: string | null
+          transcript?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       nevo_foods: {
         Row: {
           alcohol_total: number | null
@@ -256,6 +328,39 @@ export type Database = {
           user_avatar?: string | null
           user_id?: string | null
           username?: string | null
+        }
+        Relationships: []
+      }
+      symptom_logs: {
+        Row: {
+          ai_response: string | null
+          created_at: string
+          id: string
+          logged_via: string
+          safety_flags: string[] | null
+          symptoms: Json
+          transcript: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_response?: string | null
+          created_at?: string
+          id?: string
+          logged_via?: string
+          safety_flags?: string[] | null
+          symptoms?: Json
+          transcript?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_response?: string | null
+          created_at?: string
+          id?: string
+          logged_via?: string
+          safety_flags?: string[] | null
+          symptoms?: Json
+          transcript?: string | null
+          user_id?: string
         }
         Relationships: []
       }
