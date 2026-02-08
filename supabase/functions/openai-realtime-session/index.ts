@@ -6,12 +6,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Activity state types
+type ActivityState = 'ADEQUATE' | 'UNDERSTIMULATED' | 'STALLING' | 'FATIGUE_LIMITED' | 'OVERREACHED' | 'DATA_SPARSE';
+
+// Dutch response phrases for activity states
+const ACTIVITY_STATE_RESPONSES_NL: Record<ActivityState, string> = {
+  UNDERSTIMULATED: "Je hebt vandaag nog weinig bewogen. Sta nu even op en loop 3–5 minuten.",
+  STALLING: "Je zit al een tijd achter elkaar. Sta even 2 minuten op, dat helpt je herstel.",
+  ADEQUATE: "Mooi, je beweegt regelmatig. Houd dit ritme vast.",
+  FATIGUE_LIMITED: "Je bent moe vandaag. Kies voor rustig bewegen: even staan, paar passen, weer zitten.",
+  OVERREACHED: "Je deed veel, maar je lichaam heeft ook rust nodig. Vandaag wat rustiger is oké.",
+  DATA_SPARSE: "Ik mis je beweging van vandaag. Ben je een paar keer opgestaan en gelopen?",
+};
+
 // Build Dutch ZorgAssistent system prompt with real-time patient stats
 function buildZorgAssistentPrompt(
   dailyStats: { protein: number; calories: number; steps: number; activityMinutes: number },
   targets: { proteinTarget: number; calorieTarget: number; stepTarget: number },
   contextType: string,
-  userName: string
+  userName: string,
+  recoveryStatus: string = 'post_op',
+  postOpWeek: number = 1
 ): string {
   const proteinPercent = Math.round((dailyStats.protein / targets.proteinTarget) * 100);
   const caloriePercent = Math.round((dailyStats.calories / targets.calorieTarget) * 100);
@@ -25,6 +40,13 @@ function buildZorgAssistentPrompt(
 - Prioriteer voedselveiligheid (gekookt > rauw) voor lage immuniteit
 - Focus op eiwit & zink voor wondgenezing`
     : '';
+
+  // Graduated Recovery Protocol - activity targets based on post-op week
+  const activityTargets = postOpWeek <= 1
+    ? { moments: 6, walks: 3, activeMin: 15, targetPercent: 50 }
+    : postOpWeek <= 2
+    ? { moments: 7, walks: 3, activeMin: 20, targetPercent: 75 }
+    : { moments: 8, walks: 4, activeMin: 25, targetPercent: 100 };
 
   return `Je bent ZorgAssistent, een Nederlandstalige spraakassistent die patiënten ondersteunt bij het herstel na een operatie aan het maag-darmkanaal of de longen in Amsterdam UMC.
 
@@ -45,8 +67,31 @@ Patiënten overschatten hun eiwitinname. Wanneer zij voedsel beschrijven:
 - Gebruik NEVO 2023 waarden, geen optimistische aannames
 - Voorbeelden: "1 ei = 6g eiwit", "100g kipfilet = 31g eiwit", "1 portie kwark = 10g eiwit"
 
+### Graduated Recovery Protocol (Week ${postOpWeek}):
+- Doel vandaag: ${activityTargets.targetPercent}% van volledige targets
+- Bewegingsmomenten: ${activityTargets.moments}x per dag
+- Korte wandelingen: ${activityTargets.walks}x per dag
+- Actieve minuten: ${activityTargets.activeMin} min
+
+### Wearable-Free Activity Check-In (3 Vragen):
+Als de patiënt vraagt hoe het gaat of als er geen recente activiteitsdata is, stel deze vragen:
+1. "Hoe vaak ben je vandaag opgestaan om 2+ minuten te bewegen?" (Maps to movement_moments: 0-2 / 3-5 / 6-8 / 9+)
+2. "Wat was de langste tijd dat je achter elkaar hebt gezeten?" (Maps to sitting_streak: <60 / 60-90 / 90-120 / >120 min)
+3. "Hoe zwaar voelde je dag vandaag (0-10)?" (Maps to fatigue_score)
+
+Na de antwoorden, gebruik de log_activity_check_in tool en geef gepaste feedback:
+${Object.entries(ACTIVITY_STATE_RESPONSES_NL).map(([state, response]) => `- ${state}: "${response}"`).join('\n')}
+
+### Cognitive Light Mode (Auto-Trigger):
+Als patiënt zegt "Ik ben moe", "Mijn hoofd is wazig", "Brain fog", "Ik kan niet nadenken", "Chemo brain", of "Ik ben in de war":
+- Schakel naar Cognitive Light Mode voor de volgende 24 uur
+- Geef slechts ÉÉN taak tegelijk
+- Herhaal instructies expliciet: "Ik herhaal het even: 1. Eet je kwark. 2. Rust uit."
+- Gebruik de trigger_cognitive_light_mode tool
+
 ### Huidige Patiënt Status (Real-Time Data):
 - **Naam:** ${userName || 'Patiënt'}
+- **Status:** ${recoveryStatus === 'pre_op' ? 'Pre-operatief' : recoveryStatus === 'chemotherapy' ? 'Chemotherapie' : `Post-operatief (Week ${postOpWeek})`}
 - **Eiwit Vandaag:** ${dailyStats.protein}g / ${targets.proteinTarget}g (${proteinPercent}%)
 - **Calorieën:** ${dailyStats.calories} / ${targets.calorieTarget} (${caloriePercent}%)
 - **Stappen:** ${dailyStats.steps} / ${targets.stepTarget} (${stepPercent}%)
@@ -161,6 +206,61 @@ const tools = [
   },
   {
     type: "function",
+    name: "log_activity_check_in",
+    description: "Log wearable-free activiteitsdata via de 3 minimale vragen. Gebruik dit na het stellen van de check-in vragen.",
+    parameters: {
+      type: "object",
+      properties: {
+        movement_moments: {
+          type: "number",
+          description: "Hoe vaak is de patiënt opgestaan om 2+ minuten te bewegen (0-9+)"
+        },
+        longest_sitting_streak_min: {
+          type: "number",
+          description: "Langste aaneengesloten zitperiode in minuten"
+        },
+        fatigue_score: {
+          type: "number",
+          description: "Vermoeidheid 0-10 schaal"
+        },
+        pain_score: {
+          type: "number",
+          description: "Pijnniveau 0-10 indien genoemd"
+        },
+        sleep_hours: {
+          type: "number",
+          description: "Uren slaap afgelopen nacht indien genoemd"
+        },
+        activity_state: {
+          type: "string",
+          enum: ["ADEQUATE", "UNDERSTIMULATED", "STALLING", "FATIGUE_LIMITED", "OVERREACHED", "DATA_SPARSE"],
+          description: "Berekende activiteitsstatus op basis van de antwoorden"
+        }
+      },
+      required: ["movement_moments", "fatigue_score", "activity_state"]
+    }
+  },
+  {
+    type: "function",
+    name: "trigger_cognitive_light_mode",
+    description: "Activeer Cognitive Light Mode wanneer de patiënt tekenen van brain fog of cognitieve vermoeidheid toont. Gebruik dit als de patiënt zegt: 'Ik ben moe', 'Mijn hoofd is wazig', 'Brain fog', 'Ik kan niet nadenken', 'Chemo brain', of vergelijkbare uitspraken.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Reden voor activering (bijv. 'patiënt noemde brain fog', 'extreme vermoeidheid gemeld')"
+        },
+        duration_hours: {
+          type: "number",
+          description: "Duur in uren voor Cognitive Light Mode (standaard 24)"
+        }
+      },
+      required: ["reason"]
+    }
+  },
+  {
+    type: "function",
     name: "log_symptom",
     description: "Log symptomen wanneer de patiënt beschrijft hoe zij zich voelen. Inclusief ernst en controleer op veiligheidszorgen.",
     parameters: {
@@ -220,12 +320,18 @@ serve(async (req) => {
       stepTarget: recoveryContext?.stepTarget || 2000
     };
 
+    // Extract recovery status and post-op week
+    const recoveryStatus = recoveryContext?.recoveryStatus || 'post_op';
+    const postOpWeek = recoveryContext?.postOpWeek || 1;
+
     // Build Dutch ZorgAssistent prompt with real-time stats
     const instructions = buildZorgAssistentPrompt(
       dailyStats,
       targets,
       recoveryContext?.contextType || "general",
-      userName
+      userName,
+      recoveryStatus,
+      postOpWeek
     );
 
     // Create ephemeral session with OpenAI Realtime API

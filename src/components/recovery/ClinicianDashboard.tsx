@@ -16,9 +16,18 @@ import {
   Footprints,
   Moon,
   Lightbulb,
-  Printer
+  Printer,
+  Gauge
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { RecoveryBalanceGauge } from "./RecoveryBalanceGauge";
+import { HerstelindexCard } from "./HerstelindexCard";
+import { 
+  inferActivityState, 
+  ActivityState, 
+  getActivityStateLabel 
+} from "@/utils/activityStateEngine";
+import { calculateRecoveryIndex, RecoveryIndexResult } from "@/utils/recoveryIndex";
 
 interface ClinicianDashboardProps {
   proteinTarget: number;
@@ -44,6 +53,12 @@ interface ActivityLog {
   duration_minutes: number | null;
   intensity: string | null;
   step_count: number | null;
+  movement_moments: number | null;
+  longest_sitting_streak_min: number | null;
+  fatigue_score: number | null;
+  pain_score: number | null;
+  sleep_hours: number | null;
+  activity_state: string | null;
   transcript: string | null;
   created_at: string;
 }
@@ -65,6 +80,7 @@ interface WeeklyDataPoint {
   calories: number;
   steps: number;
   activityMinutes: number;
+  activityState?: string;
 }
 
 export function ClinicianDashboard({ proteinTarget, calorieTarget, stepTarget = 2000 }: ClinicianDashboardProps) {
@@ -176,6 +192,31 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget, stepTarget = 
   const totalActivityMinutes = activityLogs.reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
   const totalSteps = activityLogs.reduce((sum, log) => sum + (log.step_count || 0), 0);
 
+  // Get latest activity check-in data for state calculation
+  const latestCheckIn = activityLogs.find(log => log.activity_type === "daily_check_in");
+  
+  // Calculate current activity state
+  const currentActivityState: ActivityState = latestCheckIn?.activity_state as ActivityState || 
+    inferActivityState({
+      stepsCount: totalSteps,
+      stepsTarget: stepTarget,
+      activeMinutes: totalActivityMinutes,
+      movementMoments: latestCheckIn?.movement_moments,
+      longestSittingStreakMin: latestCheckIn?.longest_sitting_streak_min,
+      fatigue: latestCheckIn?.fatigue_score,
+      pain: latestCheckIn?.pain_score,
+      sleepHours: latestCheckIn?.sleep_hours,
+    });
+
+  // Calculate Herstelindex
+  const herstelindexResult: RecoveryIndexResult = calculateRecoveryIndex({
+    dailyProtein: totalProtein,
+    proteinTarget,
+    dailySteps: totalSteps,
+    stepTarget,
+    activityState: currentActivityState,
+  });
+
   // Check for safety flags
   const safetyAlerts = symptomLogs.filter(log => log.safety_flags && log.safety_flags.length > 0);
 
@@ -212,10 +253,10 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget, stepTarget = 
 
   // Determine activity level
   const getActivityLevel = () => {
-    if (totalActivityMinutes >= 30 || totalSteps >= stepTarget) return { label: "Active", color: "bg-green-500" };
-    if (totalActivityMinutes >= 15 || totalSteps >= stepTarget * 0.5) return { label: "Light", color: "bg-yellow-500" };
-    if (totalActivityMinutes > 0 || totalSteps > 0) return { label: "Minimal", color: "bg-orange-500" };
-    return { label: "Sedentary", color: "bg-red-500" };
+    if (totalActivityMinutes >= 30 || totalSteps >= stepTarget) return { label: "Active", color: "bg-secondary" };
+    if (totalActivityMinutes >= 15 || totalSteps >= stepTarget * 0.5) return { label: "Light", color: "bg-accent" };
+    if (totalActivityMinutes > 0 || totalSteps > 0) return { label: "Minimal", color: "bg-primary" };
+    return { label: "Sedentary", color: "bg-destructive" };
   };
 
   const activityLevel = getActivityLevel();
@@ -296,6 +337,12 @@ SLEEP QUALITY: ${avgSleepQuality.toFixed(1)}/10
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Herstelindex and Recovery Balance - Top Priority */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HerstelindexCard result={herstelindexResult} />
+          <RecoveryBalanceGauge activityState={currentActivityState} />
+        </div>
+
         {/* Safety Alerts */}
         {safetyAlerts.length > 0 && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">

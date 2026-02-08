@@ -7,6 +7,7 @@ import RecoveryContextSelection from "@/components/recovery/RecoveryContextSelec
 import BarrierTips from "@/components/recovery/BarrierTips";
 import ClinicalRationale from "@/components/recovery/ClinicalRationale";
 import { ClinicianDashboard } from "@/components/recovery/ClinicianDashboard";
+import { CognitiveLightModeUI } from "@/components/recovery/CognitiveLightModeUI";
 import { VoiceButton } from "@/components/voice/VoiceButton";
 import { IngredientUpload } from "@/components/IngredientUpload";
 import { IngredientList } from "@/components/IngredientList";
@@ -22,7 +23,7 @@ import { NutritionLabel } from "@/components/NutritionLabel";
 import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope } from "lucide-react";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope, Brain } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 interface RecoveryGoals {
@@ -88,11 +89,58 @@ const Recovery = () => {
   const [isClinicianMode, setIsClinicianMode] = useState(() => {
     return localStorage.getItem("recoveryClinicianMode") === "true";
   });
+  const [isCognitiveLightMode, setIsCognitiveLightMode] = useState(() => {
+    return localStorage.getItem("cognitiveLightMode") === "true";
+  });
+  const [dailyStats, setDailyStats] = useState({ protein: 0, calories: 0, steps: 0, activityMinutes: 0 });
 
   // Persist clinician mode preference
   useEffect(() => {
     localStorage.setItem("recoveryClinicianMode", isClinicianMode.toString());
   }, [isClinicianMode]);
+
+  // Persist cognitive light mode preference
+  useEffect(() => {
+    localStorage.setItem("cognitiveLightMode", isCognitiveLightMode.toString());
+  }, [isCognitiveLightMode]);
+
+  // Fetch today's stats for cognitive light mode and voice context
+  useEffect(() => {
+    const fetchDailyStats = async () => {
+      if (!user) return;
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayIso = today.toISOString();
+
+      const [foodResult, activityResult] = await Promise.all([
+        supabase
+          .from("food_logs")
+          .select("estimated_protein, estimated_calories")
+          .eq("user_id", user.id)
+          .gte("created_at", todayIso),
+        supabase
+          .from("activity_logs")
+          .select("step_count, duration_minutes")
+          .eq("user_id", user.id)
+          .gte("created_at", todayIso),
+      ]);
+
+      const totalProtein = (foodResult.data || []).reduce((sum, log) => sum + (log.estimated_protein || 0), 0);
+      const totalCalories = (foodResult.data || []).reduce((sum, log) => sum + (log.estimated_calories || 0), 0);
+      const totalSteps = (activityResult.data || []).reduce((sum, log) => sum + (log.step_count || 0), 0);
+      const totalMinutes = (activityResult.data || []).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+
+      setDailyStats({
+        protein: totalProtein,
+        calories: totalCalories,
+        steps: totalSteps,
+        activityMinutes: totalMinutes,
+      });
+    };
+
+    fetchDailyStats();
+  }, [user]);
 
   // Get user session and profile
   useEffect(() => {
@@ -289,24 +337,63 @@ const Recovery = () => {
     return <MedicalDisclaimer onAccept={handleAcceptDisclaimer} />;
   }
 
+  // Render Cognitive Light Mode if enabled
+  if (isCognitiveLightMode && recoveryGoals) {
+    const proteinProgress = (dailyStats.protein / recoveryGoals.proteinTarget) * 100;
+    const stepsProgress = (dailyStats.steps / 2000) * 100; // Default step target
+    
+    return (
+      <CognitiveLightModeUI
+        userName={profile?.username || "Patiënt"}
+        proteinProgress={Math.min(proteinProgress, 100)}
+        stepsProgress={Math.min(stepsProgress, 100)}
+        onExitLightMode={() => setIsCognitiveLightMode(false)}
+        recoveryContext={{
+          proteinTarget: recoveryGoals.proteinTarget,
+          calorieTarget: recoveryGoals.calorieTarget,
+          stepTarget: 2000,
+          contextType: selectedContext,
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      {/* Clinician Mode Toggle */}
+      {/* Mode Toggles */}
       <div className="container mx-auto px-4 pt-4 max-w-4xl">
-        <div className="flex items-center justify-end gap-3 p-3 bg-muted/30 rounded-lg border">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Stethoscope className="w-4 h-4" />
-            <Label htmlFor="clinician-mode" className="cursor-pointer font-medium">
-              Clinician View
-            </Label>
+        <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border">
+          {/* Cognitive Light Mode Toggle */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Brain className="w-4 h-4" />
+              <Label htmlFor="cognitive-light-mode" className="cursor-pointer font-medium">
+                Rustige Modus
+              </Label>
+            </div>
+            <Switch
+              id="cognitive-light-mode"
+              checked={isCognitiveLightMode}
+              onCheckedChange={setIsCognitiveLightMode}
+            />
           </div>
-          <Switch
-            id="clinician-mode"
-            checked={isClinicianMode}
-            onCheckedChange={setIsClinicianMode}
-          />
+          
+          {/* Clinician Mode Toggle */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Stethoscope className="w-4 h-4" />
+              <Label htmlFor="clinician-mode" className="cursor-pointer font-medium">
+                Clinician View
+              </Label>
+            </div>
+            <Switch
+              id="clinician-mode"
+              checked={isClinicianMode}
+              onCheckedChange={setIsClinicianMode}
+            />
+          </div>
         </div>
       </div>
       
