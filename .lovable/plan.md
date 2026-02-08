@@ -1,155 +1,186 @@
-# ZorgAssistent Recovery Enhancement Plan
 
-## Implementation Status: ✅ COMPLETE
 
----
+# Google Sign-In with Lovable Cloud
 
-## Features Implemented
+## Overview
 
-### 1. Database Schema Enhancements ✅
-Added new columns to support wearable-free activity tracking and cognitive light mode:
-
-**activity_logs:**
-- `movement_moments` - Times patient got up and moved 2+ minutes
-- `longest_sitting_streak_min` - Longest uninterrupted sitting period
-- `perceived_exertion_rpe` - Rate of Perceived Exertion 0-10
-- `fatigue_score` - Fatigue level 0-10
-- `pain_score` - Pain level 0-10
-- `sleep_hours` - Hours of sleep last night
-- `activity_state` - Calculated state (ADEQUATE, UNDERSTIMULATED, STALLING, etc.)
-
-**profiles:**
-- `cognitive_light_mode` - Simplified UI mode for brain fog patients
-- `surgery_date` - For post-op week calculation
-- `recovery_status` - Current phase: pre_op, post_op, chemotherapy
+This plan adds Google Sign-In to the authentication flow using Lovable Cloud's managed OAuth solution. The Recovery page will require authentication before users can use the voice assistant for health logging.
 
 ---
 
-### 2. Activity State Engine ✅
-**File:** `src/utils/activityStateEngine.ts`
+## What Will Be Implemented
 
-Wearable-free inference engine with priority-ordered state rules:
-1. DATA_SPARSE - Not enough data
-2. OVERREACHED - High activity + poor recovery
-3. FATIGUE_LIMITED - High fatigue/pain limits activity
-4. STALLING - Long sedentary streaks (>90 min)
-5. UNDERSTIMULATED - Too little activity
-6. ADEQUATE - Meeting goals with good tolerance
+### 1. Enhanced Auth Page with Google Sign-In
 
-Includes Dutch response phrases for each state.
+**File: `src/pages/Auth.tsx`**
 
----
+Add a "Continue with Google" button that uses the Lovable Cloud auth module:
 
-### 3. Recovery Index (Herstelindex) ✅
-**File:** `src/utils/recoveryIndex.ts`
+```typescript
+import { lovable } from "@/integrations/lovable/index";
 
-Unified 0-100 score calculation:
-- Protein Adherence: 33%
-- Step/Activity Goal: 33%
-- ADL Capability (based on activity state): 34%
+const handleGoogleSignIn = async () => {
+  setLoading(true);
+  try {
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) throw error;
+  } catch (error: any) {
+    toast.error(error.message || "Google sign-in failed");
+  } finally {
+    setLoading(false);
+  }
+};
+```
 
-Risk levels: low (70+), medium (50-70), high (<50)
-
----
-
-### 4. Cognitive Light Mode UI ✅
-**File:** `src/components/recovery/CognitiveLightModeUI.tsx`
-
-Simplified "Low Power Mode" for patients with chemo brain/brain fog:
-- Single "What to do now?" button
-- Binary choices (Eat/Move/Rest)
-- Voice-first interaction
-- Memory aids with repeated instructions
-- Big icons, large text, no graphs
-
-Toggle available in Recovery page header ("Rustige Modus")
+**UI Changes:**
+- Add a prominent "Continue with Google" button with Google icon
+- Add a visual divider ("or continue with email")
+- Keep existing email/password form as alternative
 
 ---
 
-### 5. Voice AI Enhancements ✅
-**File:** `supabase/functions/openai-realtime-session/index.ts`
+### 2. Authentication Protection for Recovery Page
 
-Updated ZorgAssistent prompt with:
-- Wearable-free activity check-in (3 questions)
-- Cognitive Light Mode auto-detection
-- Graduated Recovery Protocol (week-based targets)
-- Activity state-aware responses
+**File: `src/pages/Recovery.tsx`**
 
-New tools added:
-- `log_activity_check_in` - Wearable-free activity data
-- `trigger_cognitive_light_mode` - Activate simplified UI
+Add authentication check that redirects to `/auth` if the user is not logged in and wants to use features that require authentication (voice logging):
 
----
+```typescript
+const [isAuthRequired, setIsAuthRequired] = useState(false);
 
-### 6. Recovery Balance Gauge ✅
-**File:** `src/components/recovery/RecoveryBalanceGauge.tsx`
+// Show login prompt when trying to use voice assistant without auth
+const handleVoiceButtonClick = () => {
+  if (!user) {
+    setIsAuthRequired(true);
+    toast.info("Please sign in to save your health logs");
+    return;
+  }
+  // Proceed with voice assistant
+};
+```
 
-Visual gauge showing current activity state:
-- Green Zone = ADEQUATE
-- Orange Zone = STALLING / UNDERSTIMULATED
-- Red Zone = OVERREACHED / FATIGUE_LIMITED
-
----
-
-### 7. Herstelindex Card ✅
-**File:** `src/components/recovery/HerstelindexCard.tsx`
-
-Displays unified Recovery Index with:
-- Large score display (0-100)
-- Trend indicator
-- Breakdown by protein/activity/ADL
-- Risk level badge
+**Alternative Approach (Soft Gate):**
+- Allow users to browse Recovery page without auth
+- Show a gentle prompt when they try to use the voice assistant
+- Add a "Sign in to save your progress" banner for unauthenticated users
 
 ---
 
-### 8. Enhanced Clinician Dashboard ✅
-**File:** `src/components/recovery/ClinicianDashboard.tsx`
+### 3. Auth Redirect Support
 
-New sections:
-- Herstelindex and Recovery Balance at top
-- Activity state history
-- Weekly trend charts
-- Safety alerts
-- AI suggested actions
+**File: `src/pages/Auth.tsx`**
 
----
+Add support for redirect after authentication:
 
-## Graduated Recovery Protocol
+```typescript
+// Check for redirect parameter
+const searchParams = new URLSearchParams(location.search);
+const redirectTo = searchParams.get("redirect") || "/";
 
-Activity targets based on post-op week:
-
-| Week | Moments | Walks | Active Min | Target % |
-|------|---------|-------|------------|----------|
-| 1    | 6       | 3     | 15         | 50%      |
-| 2    | 7       | 3     | 20         | 75%      |
-| 3+   | 8       | 4     | 25         | 100%     |
+// After successful auth, redirect to original page
+if (event === "SIGNED_IN" && session) {
+  navigate(redirectTo);
+}
+```
 
 ---
 
-## Voice Check-In Questions (Dutch)
+## Technical Details
 
-1. "Hoe vaak ben je vandaag opgestaan om 2+ minuten te bewegen?"
-2. "Wat was de langste tijd dat je achter elkaar hebt gezeten?"
-3. "Hoe zwaar voelde je dag vandaag (0-10)?"
+### Files to Modify
 
----
+| File | Changes |
+|------|---------|
+| `src/pages/Auth.tsx` | Add Google Sign-In button using `lovable.auth.signInWithOAuth()`, add redirect support |
+| `src/pages/Recovery.tsx` | Add auth banner for unauthenticated users, link to sign in |
 
-## Activity State Responses (Dutch)
+### Dependencies
 
-| State | Response |
-|-------|----------|
-| UNDERSTIMULATED | "Je hebt vandaag nog weinig bewogen. Sta nu even op en loop 3–5 minuten." |
-| STALLING | "Je zit al een tijd achter elkaar. Sta even 2 minuten op, dat helpt je herstel." |
-| ADEQUATE | "Mooi, je beweegt regelmatig. Houd dit ritme vast." |
-| FATIGUE_LIMITED | "Je bent moe vandaag. Kies voor rustig bewegen: even staan, paar passen, weer zitten." |
-| OVERREACHED | "Je deed veel, maar je lichaam heeft ook rust nodig. Vandaag wat rustiger is oké." |
+The Lovable Cloud auth module is already configured:
+- `@lovable.dev/cloud-auth-js` package is installed
+- `src/integrations/lovable/index.ts` exports `lovable.auth.signInWithOAuth()`
+- No additional configuration needed (Google OAuth is managed by Lovable Cloud)
 
 ---
 
-## Next Steps (Future Enhancements)
+## User Flow
 
-1. **Pre-Hab Mode** - Add pre-surgery toggle for building reserve capacity
-2. **Immunonutrition Tracking** - Track Arginine/Omega-3 intake for first 14 days post-op
-3. **Surgery Date Integration** - Auto-calculate post-op week from surgery_date
-4. **ADL Milestones** - Weekly functional independence questions
-5. **Adherence Alerts** - Proactive coaching if targets missed 2+ consecutive days
+```text
+User visits /recovery
+        |
+        v
+Accepts medical disclaimer
+        |
+        v
+Browses recovery features freely
+        |
+        v
+Clicks voice assistant microphone
+        |
+        v
+[Not logged in?]
+        |
+    +---+---+
+    |       |
+   Yes      No
+    |       |
+    v       v
+Shows "Sign in"   Voice assistant
+banner with       works normally,
+Google button     logs are saved
+    |
+    v
+User clicks "Continue with Google"
+    |
+    v
+Google OAuth flow (managed by Lovable Cloud)
+    |
+    v
+Redirects back to /recovery
+    |
+    v
+Voice assistant now saves logs
+```
+
+---
+
+## UI Design
+
+### Auth Page Layout
+
+```text
++----------------------------------+
+|        Join Recipe Community      |
+|                                   |
+|   [G] Continue with Google       |  <-- Primary action
+|                                   |
+|   ─────── or continue with ───────|
+|                                   |
+|   Email: [________________]       |
+|   Password: [_____________]       |
+|                                   |
+|   [Sign Up / Sign In]             |
+|                                   |
++----------------------------------+
+```
+
+### Recovery Page Auth Banner (for unauthenticated users)
+
+```text
++------------------------------------------+
+|  [G] Sign in with Google to save your    |
+|      health logs and track progress       |
++------------------------------------------+
+```
+
+---
+
+## Why Lovable Cloud?
+
+- **No configuration needed**: Google OAuth is managed automatically
+- **Secure**: No API keys stored in code
+- **Simple**: Single function call `lovable.auth.signInWithOAuth("google")`
+- **Integrated**: Works seamlessly with the existing Supabase auth system
+
