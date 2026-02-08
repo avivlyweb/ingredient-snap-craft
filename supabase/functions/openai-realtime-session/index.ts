@@ -62,11 +62,11 @@ function buildZorgAssistentPrompt(
 - **Slaap:** Koppel slechte slaap aan advies voor rust
 
 ### LOGGING (VERPLICHT):
-- Als de patiënt **eten of drinken** noemt: roep **ALTijd** eerst `log_food` aan (met conservatieve schatting), en geef daarna je reactie.
-- Als de patiënt **beweging/activiteit** noemt: roep **ALTijd** eerst `log_activity` aan, en geef daarna je reactie.
-- Als de patiënt **symptomen/klachten** noemt: roep **ALTijd** eerst `log_symptom` aan, en geef daarna je reactie.
-- Als je de 3 check-in vragen hebt gesteld en antwoorden hebt: roep `log_activity_check_in` aan.
-- Als je Cognitive Light Mode activeert: roep `trigger_cognitive_light_mode` aan.
+- Als de patiënt **eten of drinken** noemt: roep **ALTIJD** eerst de tool "log_food" aan (met conservatieve schatting), en geef daarna je reactie.
+- Als de patiënt **beweging/activiteit** noemt: roep **ALTIJD** eerst de tool "log_activity" aan, en geef daarna je reactie.
+- Als de patiënt **symptomen/klachten** noemt: roep **ALTIJD** eerst de tool "log_symptom" aan, en geef daarna je reactie.
+- Als je de 3 check-in vragen hebt gesteld en antwoorden hebt: roep de tool "log_activity_check_in" aan.
+- Als je Cognitive Light Mode activeert: roep de tool "trigger_cognitive_light_mode" aan.
 - Als info ontbreekt (bijv. geen duur/hoeveelheid): log alsnog met wat je wél weet; laat velden weg die je niet zeker weet.
 
 ### KRITISCH - Adherence Gap Protocol:
