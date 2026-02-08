@@ -12,12 +12,18 @@ import {
   TrendingUp, 
   MessageSquare,
   RefreshCw,
-  Loader2
+  Loader2,
+  Footprints,
+  Moon,
+  Lightbulb,
+  Printer
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 interface ClinicianDashboardProps {
   proteinTarget: number;
   calorieTarget: number;
+  stepTarget?: number;
 }
 
 interface FoodLog {
@@ -26,6 +32,8 @@ interface FoodLog {
   meal_type: string | null;
   estimated_protein: number | null;
   estimated_calories: number | null;
+  protein_confidence: string | null;
+  data_source: string | null;
   transcript: string | null;
   created_at: string;
 }
@@ -35,6 +43,7 @@ interface ActivityLog {
   activity_type: string;
   duration_minutes: number | null;
   intensity: string | null;
+  step_count: number | null;
   transcript: string | null;
   created_at: string;
 }
@@ -43,16 +52,27 @@ interface SymptomLog {
   id: string;
   symptoms: Record<string, number>;
   safety_flags: string[];
+  sleep_quality: number | null;
+  suggested_action: string | null;
   ai_response: string | null;
   transcript: string | null;
   created_at: string;
 }
 
-export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDashboardProps) {
+interface WeeklyDataPoint {
+  date: string;
+  protein: number;
+  calories: number;
+  steps: number;
+  activityMinutes: number;
+}
+
+export function ClinicianDashboard({ proteinTarget, calorieTarget, stepTarget = 2000 }: ClinicianDashboardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [symptomLogs, setSymptomLogs] = useState<SymptomLog[]>([]);
+  const [weeklyData, setWeeklyData] = useState<WeeklyDataPoint[]>([]);
 
   const fetchTodayLogs = async () => {
     setIsLoading(true);
@@ -61,8 +81,14 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
 
+    // Get 7 days ago for weekly trends
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+    const weekAgoIso = weekAgo.toISOString();
+
     try {
-      const [foodResult, activityResult, symptomResult] = await Promise.all([
+      const [foodResult, activityResult, symptomResult, weeklyFoodResult, weeklyActivityResult] = await Promise.all([
         supabase
           .from("food_logs")
           .select("*")
@@ -78,11 +104,61 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
           .select("*")
           .gte("created_at", todayIso)
           .order("created_at", { ascending: false }),
+        // Weekly data for trends
+        supabase
+          .from("food_logs")
+          .select("estimated_protein, estimated_calories, created_at")
+          .gte("created_at", weekAgoIso)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("activity_logs")
+          .select("duration_minutes, step_count, created_at")
+          .gte("created_at", weekAgoIso)
+          .order("created_at", { ascending: true }),
       ]);
 
       if (foodResult.data) setFoodLogs(foodResult.data as FoodLog[]);
       if (activityResult.data) setActivityLogs(activityResult.data as ActivityLog[]);
       if (symptomResult.data) setSymptomLogs(symptomResult.data as SymptomLog[]);
+
+      // Process weekly data
+      if (weeklyFoodResult.data || weeklyActivityResult.data) {
+        const dailyAggregates: Record<string, WeeklyDataPoint> = {};
+        
+        // Initialize last 7 days
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateKey = date.toISOString().split("T")[0];
+          dailyAggregates[dateKey] = {
+            date: date.toLocaleDateString("nl-NL", { weekday: "short" }),
+            protein: 0,
+            calories: 0,
+            steps: 0,
+            activityMinutes: 0,
+          };
+        }
+
+        // Aggregate food data
+        (weeklyFoodResult.data || []).forEach((log: any) => {
+          const dateKey = log.created_at.split("T")[0];
+          if (dailyAggregates[dateKey]) {
+            dailyAggregates[dateKey].protein += log.estimated_protein || 0;
+            dailyAggregates[dateKey].calories += log.estimated_calories || 0;
+          }
+        });
+
+        // Aggregate activity data
+        (weeklyActivityResult.data || []).forEach((log: any) => {
+          const dateKey = log.created_at.split("T")[0];
+          if (dailyAggregates[dateKey]) {
+            dailyAggregates[dateKey].steps += log.step_count || 0;
+            dailyAggregates[dateKey].activityMinutes += log.duration_minutes || 0;
+          }
+        });
+
+        setWeeklyData(Object.values(dailyAggregates));
+      }
     } catch (error) {
       console.error("Error fetching logs:", error);
     } finally {
@@ -98,9 +174,24 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
   const totalProtein = foodLogs.reduce((sum, log) => sum + (log.estimated_protein || 0), 0);
   const totalCalories = foodLogs.reduce((sum, log) => sum + (log.estimated_calories || 0), 0);
   const totalActivityMinutes = activityLogs.reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+  const totalSteps = activityLogs.reduce((sum, log) => sum + (log.step_count || 0), 0);
 
   // Check for safety flags
   const safetyAlerts = symptomLogs.filter(log => log.safety_flags && log.safety_flags.length > 0);
+
+  // Get AI suggested actions
+  const suggestedActions = symptomLogs
+    .filter(log => log.suggested_action)
+    .map(log => ({
+      action: log.suggested_action!,
+      time: new Date(log.created_at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
+    }));
+
+  // Get sleep quality if reported
+  const sleepQualityLogs = symptomLogs.filter(log => log.sleep_quality !== null);
+  const avgSleepQuality = sleepQualityLogs.length > 0
+    ? sleepQualityLogs.reduce((sum, log) => sum + (log.sleep_quality || 0), 0) / sleepQualityLogs.length
+    : null;
 
   // Aggregate symptoms
   const allSymptoms: Record<string, number[]> = {};
@@ -121,13 +212,54 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
 
   // Determine activity level
   const getActivityLevel = () => {
-    if (totalActivityMinutes >= 30) return { label: "Active", color: "bg-green-500" };
-    if (totalActivityMinutes >= 15) return { label: "Light", color: "bg-yellow-500" };
-    if (totalActivityMinutes > 0) return { label: "Minimal", color: "bg-orange-500" };
+    if (totalActivityMinutes >= 30 || totalSteps >= stepTarget) return { label: "Active", color: "bg-green-500" };
+    if (totalActivityMinutes >= 15 || totalSteps >= stepTarget * 0.5) return { label: "Light", color: "bg-yellow-500" };
+    if (totalActivityMinutes > 0 || totalSteps > 0) return { label: "Minimal", color: "bg-orange-500" };
     return { label: "Sedentary", color: "bg-red-500" };
   };
 
   const activityLevel = getActivityLevel();
+
+  // Print for chart functionality
+  const handlePrintForChart = () => {
+    const printContent = `
+DAILY ROUNDING SUMMARY - ${new Date().toLocaleDateString("nl-NL")}
+=====================================
+
+NUTRITIONAL INTAKE:
+- Protein: ${totalProtein}g / ${proteinTarget}g (${Math.round((totalProtein / proteinTarget) * 100)}%)
+- Calories: ${totalCalories} / ${calorieTarget} (${Math.round((totalCalories / calorieTarget) * 100)}%)
+- Meals logged: ${foodLogs.length}
+
+ACTIVITY LEVEL: ${activityLevel.label}
+- Total activity: ${totalActivityMinutes} minutes
+- Steps: ${totalSteps} / ${stepTarget}
+
+SYMPTOMS REPORTED:
+${symptomAverages.map(s => `- ${s.symptom}: ${s.average.toFixed(1)}/10`).join("\n") || "- None reported"}
+
+${safetyAlerts.length > 0 ? `
+⚠️ SAFETY CONCERNS:
+${safetyAlerts.flatMap(log => log.safety_flags).join(", ")}
+` : ""}
+
+${suggestedActions.length > 0 ? `
+AI SUGGESTED ACTIONS:
+${suggestedActions.map(a => `- ${a.time}: ${a.action}`).join("\n")}
+` : ""}
+
+${avgSleepQuality !== null ? `
+SLEEP QUALITY: ${avgSleepQuality.toFixed(1)}/10
+` : ""}
+    `;
+    
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`<pre style="font-family: monospace; white-space: pre-wrap;">${printContent}</pre>`);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -151,10 +283,16 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
               Voice-logged health data from today
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchTodayLogs}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrintForChart}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print for Chart
+            </Button>
+            <Button variant="outline" size="sm" onClick={fetchTodayLogs}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -219,11 +357,30 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
               {foodLogs.map(log => log.items.join(", ")).join("; ")}
             </div>
           )}
+
+          {/* Protein confidence indicators */}
+          {foodLogs.some(log => log.protein_confidence) && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {foodLogs.filter(log => log.protein_confidence).map((log, i) => (
+                <Badge 
+                  key={i} 
+                  variant="outline"
+                  className={
+                    log.protein_confidence === "high" ? "border-green-500 text-green-600" :
+                    log.protein_confidence === "medium" ? "border-yellow-500 text-yellow-600" :
+                    "border-orange-500 text-orange-600"
+                  }
+                >
+                  {log.items[0]}: {log.protein_confidence} confidence
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         <Separator />
 
-        {/* Activity Level */}
+        {/* Activity Level with Steps */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-primary" />
@@ -239,16 +396,85 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
             </span>
           </div>
 
+          {/* Steps tracking */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm">
+              <Footprints className="w-4 h-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Steps</span>
+              <span className="font-medium ml-auto">
+                {totalSteps} / {stepTarget} ({Math.round((totalSteps / stepTarget) * 100)}%)
+              </span>
+            </div>
+            <Progress 
+              value={Math.min((totalSteps / stepTarget) * 100, 100)} 
+              className="h-2"
+            />
+          </div>
+
           {activityLogs.length > 0 && (
             <div className="text-sm text-muted-foreground">
               Activities: {activityLogs.map(log => 
-                `${log.activity_type}${log.duration_minutes ? ` (${log.duration_minutes}min)` : ""}`
+                `${log.activity_type}${log.duration_minutes ? ` (${log.duration_minutes}min)` : ""}${log.step_count ? ` - ${log.step_count} steps` : ""}`
               ).join(", ")}
             </div>
           )}
         </div>
 
         <Separator />
+
+        {/* Sleep Quality */}
+        {avgSleepQuality !== null && (
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Moon className="w-5 h-5 text-indigo-500" />
+                <h4 className="font-medium">Sleep Quality</h4>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge 
+                  variant="outline"
+                  className={
+                    avgSleepQuality >= 7 ? "border-green-500 text-green-600" :
+                    avgSleepQuality >= 4 ? "border-yellow-500 text-yellow-600" :
+                    "border-red-500 text-red-600"
+                  }
+                >
+                  {avgSleepQuality.toFixed(1)}/10
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {avgSleepQuality >= 7 ? "Good sleep reported" : 
+                   avgSleepQuality >= 4 ? "Moderate sleep quality" : 
+                   "Poor sleep - consider fatigue management"}
+                </span>
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* AI Suggested Actions */}
+        {suggestedActions.length > 0 && (
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-amber-500" />
+                <h4 className="font-medium">AI Suggested Actions</h4>
+              </div>
+              <div className="space-y-2">
+                {suggestedActions.map((action, i) => (
+                  <div 
+                    key={i} 
+                    className="flex items-start gap-2 text-sm bg-amber-50 dark:bg-amber-900/20 p-2 rounded"
+                  >
+                    <span className="text-muted-foreground text-xs">{action.time}</span>
+                    <span>{action.action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
 
         {/* Symptom Summary */}
         <div className="space-y-3">
@@ -277,6 +503,54 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget }: ClinicianDa
             <p className="text-sm text-muted-foreground">No symptoms reported today</p>
           )}
         </div>
+
+        {/* Weekly Trends */}
+        {weeklyData.length > 0 && weeklyData.some(d => d.protein > 0 || d.steps > 0) && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <h4 className="font-medium">Weekly Trends</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Protein Trend */}
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Protein Intake (g)</span>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={weeklyData}>
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Bar dataKey="protein" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Activity Trend */}
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Activity (minutes)</span>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={weeklyData}>
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line 
+                          type="monotone" 
+                          dataKey="activityMinutes" 
+                          stroke="hsl(var(--secondary))" 
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* AI Notes */}
         {symptomLogs.some(log => log.ai_response) && (

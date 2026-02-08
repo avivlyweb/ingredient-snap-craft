@@ -23,6 +23,7 @@ export type Database = {
           intensity: string | null
           logged_via: string
           notes: string | null
+          step_count: number | null
           transcript: string | null
           user_id: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           intensity?: string | null
           logged_via?: string
           notes?: string | null
+          step_count?: number | null
           transcript?: string | null
           user_id: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           intensity?: string | null
           logged_via?: string
           notes?: string | null
+          step_count?: number | null
           transcript?: string | null
           user_id?: string
         }
@@ -53,34 +56,40 @@ export type Database = {
       food_logs: {
         Row: {
           created_at: string
+          data_source: string | null
           estimated_calories: number | null
           estimated_protein: number | null
           id: string
           items: string[]
           logged_via: string
           meal_type: string | null
+          protein_confidence: string | null
           transcript: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          data_source?: string | null
           estimated_calories?: number | null
           estimated_protein?: number | null
           id?: string
           items?: string[]
           logged_via?: string
           meal_type?: string | null
+          protein_confidence?: string | null
           transcript?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          data_source?: string | null
           estimated_calories?: number | null
           estimated_protein?: number | null
           id?: string
           items?: string[]
           logged_via?: string
           meal_type?: string | null
+          protein_confidence?: string | null
           transcript?: string | null
           user_id?: string
         }
@@ -338,6 +347,8 @@ export type Database = {
           id: string
           logged_via: string
           safety_flags: string[] | null
+          sleep_quality: number | null
+          suggested_action: string | null
           symptoms: Json
           transcript: string | null
           user_id: string
@@ -348,6 +359,8 @@ export type Database = {
           id?: string
           logged_via?: string
           safety_flags?: string[] | null
+          sleep_quality?: number | null
+          suggested_action?: string | null
           symptoms?: Json
           transcript?: string | null
           user_id: string
@@ -358,6 +371,8 @@ export type Database = {
           id?: string
           logged_via?: string
           safety_flags?: string[] | null
+          sleep_quality?: number | null
+          suggested_action?: string | null
           symptoms?: Json
           transcript?: string | null
           user_id?: string

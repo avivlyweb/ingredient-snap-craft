@@ -1,6 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+interface DailyStats {
+  protein: number;
+  calories: number;
+  steps: number;
+  activityMinutes: number;
+}
+
 interface VoiceConversationOptions {
   onTranscript?: (text: string, isFinal: boolean) => void;
   onAIResponse?: (text: string) => void;
@@ -10,6 +17,7 @@ interface VoiceConversationOptions {
     contextType?: string;
     proteinTarget?: number;
     calorieTarget?: number;
+    stepTarget?: number;
   };
 }
 
@@ -19,6 +27,51 @@ interface VoiceConversationState {
   isSpeaking: boolean;
   isConnecting: boolean;
   error: string | null;
+  dailyStats: DailyStats;
+}
+
+// Fetch today's aggregated stats from the database
+async function fetchTodayStats(userId: string): Promise<DailyStats> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = today.toISOString();
+
+  try {
+    const [foodResult, activityResult] = await Promise.all([
+      supabase
+        .from("food_logs")
+        .select("estimated_protein, estimated_calories")
+        .eq("user_id", userId)
+        .gte("created_at", todayIso),
+      supabase
+        .from("activity_logs")
+        .select("duration_minutes, step_count")
+        .eq("user_id", userId)
+        .gte("created_at", todayIso),
+    ]);
+
+    const protein = (foodResult.data || []).reduce(
+      (sum, log) => sum + (log.estimated_protein || 0),
+      0
+    );
+    const calories = (foodResult.data || []).reduce(
+      (sum, log) => sum + (log.estimated_calories || 0),
+      0
+    );
+    const activityMinutes = (activityResult.data || []).reduce(
+      (sum, log) => sum + (log.duration_minutes || 0),
+      0
+    );
+    const steps = (activityResult.data || []).reduce(
+      (sum, log) => sum + (log.step_count || 0),
+      0
+    );
+
+    return { protein, calories, steps, activityMinutes };
+  } catch (error) {
+    console.error("Error fetching daily stats:", error);
+    return { protein: 0, calories: 0, steps: 0, activityMinutes: 0 };
+  }
 }
 
 export function useVoiceConversation(options: VoiceConversationOptions = {}) {
@@ -28,6 +81,7 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
     isSpeaking: false,
     isConnecting: false,
     error: null,
+    dailyStats: { protein: 0, calories: 0, steps: 0, activityMinutes: 0 },
   });
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -102,6 +156,13 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
       );
 
       const result = await response.json();
+
+      // Update local daily stats after successful food or activity log
+      if (result.success && (logType === "food" || logType === "activity")) {
+        const updatedStats = await fetchTodayStats(session.user.id);
+        setState(prev => ({ ...prev, dailyStats: updatedStats }));
+      }
+
       return result;
     } catch (error) {
       console.error("Failed to log health data:", error);
@@ -124,13 +185,36 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
       });
       streamRef.current = stream;
 
-      // Get ephemeral token from edge function
+      // Get user session and fetch daily stats
+      const { data: { session } } = await supabase.auth.getSession();
+      let dailyStats: DailyStats = { protein: 0, calories: 0, steps: 0, activityMinutes: 0 };
+      let userName = "Patiënt";
+
+      if (session?.user) {
+        dailyStats = await fetchTodayStats(session.user.id);
+        setState(prev => ({ ...prev, dailyStats }));
+        
+        // Try to get user name from profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("user_id", session.user.id)
+          .single();
+        
+        if (profile?.username) {
+          userName = profile.username;
+        }
+      }
+
+      // Get ephemeral token from edge function with daily stats
       const { data: sessionData, error: sessionError } = await supabase.functions.invoke(
         "openai-realtime-session",
         {
           body: {
             voice: "shimmer", // Warm, empathetic voice
             recoveryContext: options.recoveryContext,
+            dailyStats,
+            userName,
           },
         }
       );

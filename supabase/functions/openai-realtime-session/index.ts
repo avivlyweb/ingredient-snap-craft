@@ -6,101 +6,154 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const ZORGASSISTENT_INSTRUCTIONS = `You are ZorgAssistent, an empathetic Dutch Recovery Companion specializing in post-operative care.
+// Build Dutch ZorgAssistent system prompt with real-time patient stats
+function buildZorgAssistentPrompt(
+  dailyStats: { protein: number; calories: number; steps: number; activityMinutes: number },
+  targets: { proteinTarget: number; calorieTarget: number; stepTarget: number },
+  contextType: string,
+  userName: string
+): string {
+  const proteinPercent = Math.round((dailyStats.protein / targets.proteinTarget) * 100);
+  const caloriePercent = Math.round((dailyStats.calories / targets.calorieTarget) * 100);
+  const stepPercent = Math.round((dailyStats.steps / targets.stepTarget) * 100);
 
-**Core Identity:**
-- Name: ZorgAssistent
-- Role: Warm, encouraging health companion for patients recovering from surgery
-- Tone: Caring, patient-friendly, clinically informed but accessible
-- Language: Respond in the same language the patient uses (Dutch or English)
+  const contextSpecificRules = contextType === 'cancer_support' || contextType === 'energy_boost'
+    ? `
+### Context-Specifieke Regels (${contextType}):
+- Als patiënt moeheid of vermoeidheid noemt, stel "Zittend Bereiden" recepten voor (minimaal staan)
+- Voorbeeld: "Overweeg een maaltijd die je zittend kunt bereiden"
+- Prioriteer voedselveiligheid (gekookt > rauw) voor lage immuniteit
+- Focus op eiwit & zink voor wondgenezing`
+    : '';
 
-**Your Mission:**
-You help patients track their nutrition, activity, and symptoms during recovery. You:
-1. Listen attentively to what they ate, how they moved, and how they feel
-2. Extract health data silently using your tools (don't announce you're logging)
-3. Provide encouraging feedback and practical tips
-4. Check intake against recovery targets (protein: 1.5g/kg body weight)
-5. Immediately escalate safety concerns
+  return `Je bent ZorgAssistent, een Nederlandstalige spraakassistent die patiënten ondersteunt bij het herstel na een operatie aan het maag-darmkanaal of de longen in Amsterdam UMC.
 
-**Behavioral Rules:**
-- Always acknowledge what the patient said warmly
-- Give brief, motivating responses (not lectures)
-- If they mention eating: estimate protein content and encourage progress
-- If they mention activity: praise any movement, especially walking
-- If they mention symptoms: show empathy first, then log
+### Jouw Rol:
+- **Korte, gesproken antwoorden** (Max 3 zinnen)
+- **Taal:** Enkel in het Nederlands
+- **Toon:** Ondersteunend, motiverend, en waarderend
 
-**Safety Protocol (CRITICAL):**
-If the patient mentions ANY of these, immediately advise contacting their care team:
-- Fever, high temperature
-- Red, swollen, or infected wound
-- Pus or discharge from wound
-- Severe pain
-- Difficulty breathing
-- Persistent vomiting
+### Context & Regels (ReasoningCore v4):
+- **Voeding:** Als eiwit < 50% van doel, adviseer een snack (kwark, noten, ei)
+- **Beweging:** Als stappen laag zijn, adviseer een kleine wandeling
+- **Slaap:** Koppel slechte slaap aan advies voor rust
 
-Response: "I'm concerned about what you're describing. Please contact your care team or call your hospital right away. This needs professional attention."
+### KRITISCH - Adherence Gap Protocol:
+Patiënten overschatten hun eiwitinname. Wanneer zij voedsel beschrijven:
+- Wees conservatief met schattingen
+- Als het klinkt als 15g eiwit, zeg dan 15g (NIET naar boven afronden)
+- Gebruik NEVO 2023 waarden, geen optimistische aannames
+- Voorbeelden: "1 ei = 6g eiwit", "100g kipfilet = 31g eiwit", "1 portie kwark = 10g eiwit"
 
-**Example Interactions:**
+### Huidige Patiënt Status (Real-Time Data):
+- **Naam:** ${userName || 'Patiënt'}
+- **Eiwit Vandaag:** ${dailyStats.protein}g / ${targets.proteinTarget}g (${proteinPercent}%)
+- **Calorieën:** ${dailyStats.calories} / ${targets.calorieTarget} (${caloriePercent}%)
+- **Stappen:** ${dailyStats.steps} / ${targets.stepTarget} (${stepPercent}%)
+- **Actieve Minuten:** ${dailyStats.activityMinutes} min
+${contextSpecificRules}
 
-Patient: "I had scrambled eggs and toast for breakfast"
-You: "Great choice! That's about 18 grams of protein - eggs are perfect for healing. You're making good progress toward your daily goal. How are you feeling energy-wise?"
+### Veiligheidsprotocol (KRITISCH):
+Als de patiënt EEN van deze noemt, adviseer ONMIDDELLIJK contact met het zorgteam:
+- Koorts, hoge temperatuur
+- Rode, gezwollen, of geïnfecteerde wond
+- Pus of afscheiding uit wond
+- Ernstige pijn
+- Moeite met ademhalen
+- Aanhoudend braken
 
-Patient: "I walked to the kitchen and back today"
-You: "That's wonderful! Every bit of movement helps your recovery. Your body is getting stronger. How did it feel?"
+Reactie: "Ik maak me zorgen over wat je beschrijft. Neem alsjeblieft direct contact op met je zorgteam of bel het ziekenhuis. Dit heeft professionele aandacht nodig."
 
-Patient: "I'm feeling really tired and a bit nauseated"
-You: "I understand - fatigue and nausea are common in the first days. Try small sips of ginger tea or water. If the nausea gets worse or you can't keep fluids down, let your care team know."`;
+### Gedragsregels:
+- Erken altijd warm wat de patiënt zei
+- Geef korte, motiverende reacties (geen lezingen)
+- Bij eten: schat eiwitgehalte en moedig vooruitgang aan
+- Bij activiteit: prijs elke beweging, vooral wandelen
+- Bij symptomen: toon eerst empathie, log dan
 
-// Tool definitions for function calling
+### Voorbeeld Interacties:
+
+Patiënt: "Ik heb twee gebakken eieren met toast gegeten"
+Jij: "Goed bezig! Dat is ongeveer 14 gram eiwit - je staat nu op ${dailyStats.protein + 14}g. ${proteinPercent < 50 ? 'Overweeg een kwarkje als tussendoortje?' : 'Je bent lekker op weg!'}"
+
+Patiënt: "Ik ben naar de keuken en terug gelopen"
+Jij: "Fantastisch! Elke stap helpt je herstel. Je lichaam wordt sterker. Hoe voelde dat?"
+
+Patiënt: "Ik voel me heel moe en een beetje misselijk"
+Jij: "Dat begrijp ik - vermoeidheid en misselijkheid zijn normaal in de eerste dagen. Probeer kleine slokjes gemberthee of water. Als de misselijkheid erger wordt, laat je zorgteam weten."
+
+**Je doel:** Help ${userName || 'de patiënt'} hun dagdoelen te halen met simpele, praktische stappen.`;
+}
+
+// Enhanced tool definitions with granular data tracking
 const tools = [
   {
     type: "function",
     name: "log_food",
-    description: "Log food intake when the patient mentions eating or drinking something. Extract all food items mentioned.",
+    description: "Log voedselinname wanneer de patiënt eten of drinken noemt. Extraheer alle voedselitems met conservatieve eiwitschattingen volgens NEVO 2023 waarden.",
     parameters: {
       type: "object",
       properties: {
         items: {
           type: "array",
           items: { type: "string" },
-          description: "List of food items mentioned (e.g., 'scrambled eggs', 'toast', 'orange juice')"
+          description: "Lijst van voedselitems (bijv. 'gebakken eieren', 'toast', 'sinaasappelsap')"
         },
         meal_type: {
           type: "string",
           enum: ["breakfast", "lunch", "dinner", "snack"],
-          description: "Type of meal if mentioned or can be inferred from context"
+          description: "Type maaltijd indien genoemd of af te leiden uit context"
         },
         estimated_protein_grams: {
           type: "number",
-          description: "Estimated total protein in grams for all items"
+          description: "Geschat totaal eiwit in grammen - wees conservatief, niet afronden naar boven"
         },
         estimated_calories: {
           type: "number",
-          description: "Estimated total calories for all items"
+          description: "Geschat totaal calorieën voor alle items"
+        },
+        protein_confidence: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Betrouwbaarheid van eiwitschatting: 'high' als exacte hoeveelheden genoemd, 'medium' als typische porties, 'low' als onduidelijk"
+        },
+        data_source: {
+          type: "string",
+          enum: ["patient_reported", "nevo_lookup"],
+          description: "Bron van voedingswaarden: 'nevo_lookup' als NEVO waarden gebruikt, anders 'patient_reported'"
         }
       },
-      required: ["items"]
+      required: ["items", "estimated_protein_grams", "protein_confidence"]
     }
   },
   {
     type: "function",
     name: "log_activity",
-    description: "Log physical activity when the patient mentions movement, walking, exercise, or physiotherapy.",
+    description: "Log fysieke activiteit wanneer de patiënt beweging, wandelen, oefeningen of fysiotherapie noemt.",
     parameters: {
       type: "object",
       properties: {
         activity_type: {
           type: "string",
-          description: "Type of activity (e.g., 'walking', 'physiotherapy', 'climbing stairs', 'stretching')"
+          description: "Type activiteit (bijv. 'wandelen', 'fysiotherapie', 'traplopen', 'stretchen')"
         },
         duration_minutes: {
           type: "number",
-          description: "Duration in minutes if mentioned"
+          description: "Duur in minuten indien genoemd"
         },
         intensity: {
           type: "string",
           enum: ["low", "medium", "high"],
-          description: "Intensity level based on the activity described"
+          description: "Intensiteitsniveau gebaseerd op beschreven activiteit"
+        },
+        step_count: {
+          type: "number",
+          description: "Geschat aantal stappen indien relevant (100 stappen per minuut wandelen)"
+        },
+        anabolic_window_timing: {
+          type: "string",
+          enum: ["pre_meal", "post_meal", "unrelated"],
+          description: "Timing ten opzichte van maaltijden voor optimale eiwitopname"
         }
       },
       required: ["activity_type"]
@@ -109,23 +162,31 @@ const tools = [
   {
     type: "function",
     name: "log_symptom",
-    description: "Log symptoms when the patient describes how they feel. Include severity and check for safety concerns.",
+    description: "Log symptomen wanneer de patiënt beschrijft hoe zij zich voelen. Inclusief ernst en controleer op veiligheidszorgen.",
     parameters: {
       type: "object",
       properties: {
         symptoms: {
           type: "object",
-          description: "Object with symptom names as keys and severity (1-10) as values. E.g., {\"fatigue\": 7, \"nausea\": 4}",
+          description: "Object met symptoomnamen als sleutels en ernst (1-10) als waarden. Bijv. {\"vermoeidheid\": 7, \"misselijkheid\": 4}",
           additionalProperties: { type: "number" }
         },
         safety_flags: {
           type: "array",
           items: { type: "string" },
-          description: "Any safety concerns detected: 'fever', 'red_wound', 'severe_pain', 'breathing_difficulty', 'persistent_vomiting'"
+          description: "Gedetecteerde veiligheidszorgen: 'koorts', 'rode_wond', 'ernstige_pijn', 'ademhalingsproblemen', 'aanhoudend_braken'"
+        },
+        sleep_quality: {
+          type: "number",
+          description: "Slaapkwaliteit (1-10) indien genoemd, voor vermoeidheidcorrelatie"
+        },
+        suggested_action: {
+          type: "string",
+          description: "Je aanbevolen actie voor de patiënt (bijv. 'rust nemen', 'contact opnemen met zorgteam', 'gemberthee proberen')"
         },
         notes: {
           type: "string",
-          description: "Any additional context about the symptoms"
+          description: "Extra context over de symptomen"
         }
       },
       required: ["symptoms"]
@@ -145,16 +206,27 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { voice = "alloy", recoveryContext } = body;
+    const { 
+      voice = "shimmer", 
+      recoveryContext,
+      dailyStats = { protein: 0, calories: 0, steps: 0, activityMinutes: 0 },
+      userName = "Patiënt"
+    } = body;
 
-    // Build context-aware instructions
-    let instructions = ZORGASSISTENT_INSTRUCTIONS;
-    if (recoveryContext) {
-      instructions += `\n\n**Patient Context:**
-- Recovery Challenge: ${recoveryContext.contextType || "General recovery"}
-- Daily Protein Target: ${recoveryContext.proteinTarget || 90}g
-- Daily Calorie Target: ${recoveryContext.calorieTarget || 2000} kcal`;
-    }
+    // Set targets from context or defaults
+    const targets = {
+      proteinTarget: recoveryContext?.proteinTarget || 90,
+      calorieTarget: recoveryContext?.calorieTarget || 2000,
+      stepTarget: recoveryContext?.stepTarget || 2000
+    };
+
+    // Build Dutch ZorgAssistent prompt with real-time stats
+    const instructions = buildZorgAssistentPrompt(
+      dailyStats,
+      targets,
+      recoveryContext?.contextType || "general",
+      userName
+    );
 
     // Create ephemeral session with OpenAI Realtime API
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
