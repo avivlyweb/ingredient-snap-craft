@@ -84,10 +84,12 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
     dailyStats: { protein: 0, calories: 0, steps: 0, activityMinutes: 0 },
   });
 
+
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastFinalTranscriptRef = useRef<string>("");
 
   // Clean up resources
   const cleanup = useCallback(() => {
@@ -116,59 +118,65 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
   }, []);
 
   // Handle tool calls from the AI
-  const handleToolCall = useCallback(async (toolName: string, args: Record<string, unknown>, transcript?: string) => {
-    options.onToolCall?.(toolName, args);
+  const handleToolCall = useCallback(
+    async (toolName: string, args: Record<string, unknown>, transcript?: string) => {
+      options.onToolCall?.(toolName, args);
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.warn("No user session - cannot log health data");
-        return { success: false, error: "User not authenticated" };
-      }
-
-      // Map tool names to log types
-      const logTypeMap: Record<string, string> = {
-        log_food: "food",
-        log_activity: "activity",
-        log_symptom: "symptom",
-      };
-
-      const logType = logTypeMap[toolName];
-      if (!logType) {
-        console.warn("Unknown tool:", toolName);
-        return { success: false, error: "Unknown tool" };
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-log-health`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            logType,
-            data: args,
-            transcript,
-          }),
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.warn("No user session - cannot log health data");
+          return { success: false, error: "User not authenticated" };
         }
-      );
 
-      const result = await response.json();
+        // Map tool names to log types expected by the backend function
+        const logTypeMap: Record<string, string> = {
+          log_food: "food",
+          log_activity: "activity",
+          log_symptom: "symptom",
+          log_activity_check_in: "activity_check_in",
+          trigger_cognitive_light_mode: "cognitive_light_mode",
+        };
 
-      // Update local daily stats after successful food or activity log
-      if (result.success && (logType === "food" || logType === "activity")) {
-        const updatedStats = await fetchTodayStats(session.user.id);
-        setState(prev => ({ ...prev, dailyStats: updatedStats }));
+        const logType = logTypeMap[toolName];
+        if (!logType) {
+          console.warn("Unknown tool:", toolName);
+          return { success: false, error: "Unknown tool" };
+        }
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-log-health`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              logType,
+              data: args,
+              transcript,
+            }),
+          }
+        );
+
+        const result = await response.json();
+
+        // Update local daily stats after successful food or activity log
+        if (result.success && (logType === "food" || logType === "activity")) {
+          const updatedStats = await fetchTodayStats(session.user.id);
+          setState(prev => ({ ...prev, dailyStats: updatedStats }));
+        }
+
+        return result;
+      } catch (error) {
+        console.error("Failed to log health data:", error);
+        return { success: false, error: String(error) };
       }
+    },
+    [options]
+  );
 
-      return result;
-    } catch (error) {
-      console.error("Failed to log health data:", error);
-      return { success: false, error: String(error) };
-    }
-  }, [options]);
 
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -248,43 +256,53 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
         setState(prev => ({ ...prev, isConnected: true, isListening: true }));
       };
 
+
       dc.onmessage = async (event) => {
         try {
           const message = JSON.parse(event.data);
-          
+
           switch (message.type) {
-            case "conversation.item.input_audio_transcription.completed":
-              options.onTranscript?.(message.transcript, true);
+            case "conversation.item.input_audio_transcription.completed": {
+              const text = String(message.transcript ?? "");
+              if (text.trim()) lastFinalTranscriptRef.current = text;
+              options.onTranscript?.(text, true);
               break;
-              
+            }
+
             case "response.audio_transcript.delta":
               options.onAIResponse?.(message.delta);
               break;
-              
+
             case "response.audio.started":
               setState(prev => ({ ...prev, isSpeaking: true }));
               break;
-              
+
             case "response.audio.done":
               setState(prev => ({ ...prev, isSpeaking: false }));
               break;
-              
+
             case "response.function_call_arguments.done":
               if (message.name && message.arguments) {
                 try {
                   const args = JSON.parse(message.arguments);
-                  const result = await handleToolCall(message.name, args);
-                  
+                  const result = await handleToolCall(
+                    message.name,
+                    args,
+                    lastFinalTranscriptRef.current || undefined
+                  );
+
                   // Send tool result back to AI
                   if (dc.readyState === "open") {
-                    dc.send(JSON.stringify({
-                      type: "conversation.item.create",
-                      item: {
-                        type: "function_call_output",
-                        call_id: message.call_id,
-                        output: JSON.stringify(result),
-                      },
-                    }));
+                    dc.send(
+                      JSON.stringify({
+                        type: "conversation.item.create",
+                        item: {
+                          type: "function_call_output",
+                          call_id: message.call_id,
+                          output: JSON.stringify(result),
+                        },
+                      })
+                    );
                     dc.send(JSON.stringify({ type: "response.create" }));
                   }
                 } catch (e) {
@@ -292,11 +310,11 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
                 }
               }
               break;
-              
+
             case "input_audio_buffer.speech_started":
               setState(prev => ({ ...prev, isListening: true }));
               break;
-              
+
             case "input_audio_buffer.speech_stopped":
               setState(prev => ({ ...prev, isListening: false }));
               break;
@@ -305,6 +323,7 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
           console.error("Failed to parse message:", e);
         }
       };
+
 
       dc.onerror = (error) => {
         console.error("Data channel error:", error);
