@@ -40,7 +40,14 @@ serve(async (req) => {
 
     switch (logType) {
       case "food": {
-        const { items, meal_type, estimated_protein_grams, estimated_calories } = data;
+        const { 
+          items, 
+          meal_type, 
+          estimated_protein_grams, 
+          estimated_calories,
+          protein_confidence,
+          data_source 
+        } = data;
         
         const { data: insertedData, error } = await supabaseClient
           .from("food_logs")
@@ -50,6 +57,8 @@ serve(async (req) => {
             meal_type: meal_type,
             estimated_protein: estimated_protein_grams,
             estimated_calories: estimated_calories,
+            protein_confidence: protein_confidence || null,
+            data_source: data_source || "patient_reported",
             logged_via: "voice",
             transcript: transcript
           })
@@ -59,14 +68,20 @@ serve(async (req) => {
         if (error) throw error;
         result = { 
           success: true, 
-          message: `Logged ${items?.length || 0} food item(s)`,
+          message: `Logged ${items?.length || 0} food item(s) with ${estimated_protein_grams || 0}g protein`,
           data: insertedData
         };
         break;
       }
 
       case "activity": {
-        const { activity_type, duration_minutes, intensity } = data;
+        const { 
+          activity_type, 
+          duration_minutes, 
+          intensity,
+          step_count,
+          anabolic_window_timing 
+        } = data;
         
         const { data: insertedData, error } = await supabaseClient
           .from("activity_logs")
@@ -75,6 +90,8 @@ serve(async (req) => {
             activity_type: activity_type,
             duration_minutes: duration_minutes,
             intensity: intensity,
+            step_count: step_count || null,
+            notes: anabolic_window_timing ? `Timing: ${anabolic_window_timing}` : null,
             logged_via: "voice",
             transcript: transcript
           })
@@ -84,14 +101,20 @@ serve(async (req) => {
         if (error) throw error;
         result = { 
           success: true, 
-          message: `Logged activity: ${activity_type}`,
+          message: `Logged activity: ${activity_type}${step_count ? ` (${step_count} steps)` : ''}`,
           data: insertedData
         };
         break;
       }
 
       case "symptom": {
-        const { symptoms, safety_flags, notes } = data;
+        const { 
+          symptoms, 
+          safety_flags, 
+          notes,
+          sleep_quality,
+          suggested_action 
+        } = data;
         
         const { data: insertedData, error } = await supabaseClient
           .from("symptom_logs")
@@ -99,6 +122,8 @@ serve(async (req) => {
             user_id: user.id,
             symptoms: symptoms || {},
             safety_flags: safety_flags || [],
+            sleep_quality: sleep_quality || null,
+            suggested_action: suggested_action || null,
             ai_response: aiResponse,
             logged_via: "voice",
             transcript: transcript
@@ -118,6 +143,7 @@ serve(async (req) => {
             : `Logged ${Object.keys(symptoms || {}).length} symptom(s)`,
           hasSafetyFlags,
           safetyFlags: safety_flags,
+          suggestedAction: suggested_action,
           data: insertedData
         };
         break;
