@@ -1,351 +1,267 @@
 
 
-# ZorgAssistent Voice Companion (OpenAI Realtime API)
+# Voice Companion Enhancement Plan
 
 ## Overview
-This feature adds a voice interface to the app using **OpenAI's Realtime API with WebRTC**, transforming it into an active "Recovery Companion" that monitors Food, Activity, and Symptoms through natural conversation.
+
+Based on comparing your detailed specifications with the current implementation, here are the key improvements to upgrade the ZorgAssistent Voice Companion to a more sophisticated, Dutch-localized, and context-aware system.
 
 ---
 
-## Important: API Key Requirement
+## Current State Analysis
 
-The OpenAI Realtime API requires a separate **OpenAI API key** (not available through Lovable AI gateway). You will need to:
+The voice system already has:
+- WebRTC connection to OpenAI Realtime API
+- Basic ZorgAssistent persona with safety protocols
+- Tool definitions for `log_food`, `log_activity`, `log_symptom`
+- Clinician Dashboard with daily summaries
+- Floating voice button on Recovery page
 
-1. Have an OpenAI account with API access
-2. Enable the Realtime API (currently in beta)
-3. Provide your OpenAI API key when prompted during implementation
+**What's Missing from Your Specifications:**
 
-The implementation will use the secure **ephemeral token** pattern - your API key stays on the server, while short-lived tokens (60 second TTL) are sent to the client for WebRTC connections.
+| Feature | Status | Priority |
+|---------|--------|----------|
+| Dutch-only persona with real-time patient stats | Not implemented | High |
+| Dynamic context injection (protein %, steps, etc.) | Partially done | High |
+| "Adherence Gap" strict nutrition estimates | Not implemented | Medium |
+| Fatigue-aware "Seated Prep" recipe suggestions | Not implemented | Medium |
+| Activity pacing (anabolic window) | Not implemented | Low |
+| Steps tracking integration | Not implemented | Medium |
 
 ---
 
 ## Implementation Steps
 
-### 1. Database Schema for Health Logging
+### 1. Upgrade ZorgAssistent System Prompt (Dutch Personality)
 
-Create three new tables to store voice-logged health data:
+**File:** `supabase/functions/openai-realtime-session/index.ts`
 
-**food_logs table:**
+Replace the current English-focused prompt with the exact Dutch personality specification:
+
+**New Prompt Structure:**
+```text
+Je bent ZorgAssistent, een Nederlandstalige spraakassistent 
+die patienten ondersteunt bij het herstel na een operatie 
+aan het maag-darmkanaal of de longen in Amsterdam UMC.
+
+### Jouw Rol:
+- Korte, gesproken antwoorden (Max 3 zinnen)
+- Taal: Enkel in het Nederlands
+- Toon: Ondersteunend, motiverend, en waarderend
+
+### Context & Regels (ReasoningCore v4):
+- Voeding: Als eiwit < 50% van doel, adviseer een snack
+- Beweging: Als stappen laag zijn, adviseer wandeling
+- Slaap: Koppel slechte slaap aan advies voor rust
+
+### Huidige Patient Status:
+- Naam: ${userName}
+- Eiwit Vandaag: ${dailyProtein}g / ${proteinTarget}g
+- Calorien: ${dailyCalories} / ${calorieTarget}
+- Stappen: ${dailySteps} / ${stepTarget}
+```
+
+---
+
+### 2. Real-Time Patient Status Injection
+
+**Files:** 
+- `src/hooks/useVoiceConversation.ts`
+- `supabase/functions/openai-realtime-session/index.ts`
+
+Before connecting to the Realtime API, fetch today's aggregated data:
+
+**New Data Flow:**
+```text
+1. Client requests voice session
+   |
+   v
+2. Edge function queries today's food_logs, activity_logs
+   |
+   v
+3. Calculate: totalProtein, totalCalories, totalSteps
+   |
+   v
+4. Inject into system prompt dynamically
+   |
+   v
+5. AI knows: "Patient at 45g/90g protein (50%)"
+```
+
+**Changes to Edge Function:**
+- Accept `dailyStats` in request body
+- Calculate percentages and inject into prompt
+- AI can now give contextual advice: "Je zit op de helft van je eiwitdoel!"
+
+---
+
+### 3. Add Steps Tracking to Database
+
+**Database Migration:**
+
+Add new columns to `activity_logs`:
+- `step_count` (integer) - for step-based activities
+
+Create optional `daily_summaries` table:
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
 | user_id | uuid | Reference to user |
-| items | text[] | Food items logged |
-| meal_type | text | breakfast/lunch/dinner/snack |
-| estimated_protein | numeric | AI-estimated protein (g) |
-| estimated_calories | numeric | AI-estimated calories |
-| logged_via | text | 'voice' or 'manual' |
-| transcript | text | Original user speech |
-| created_at | timestamp | Log timestamp |
+| date | date | The day |
+| total_protein | numeric | Sum from food_logs |
+| total_calories | numeric | Sum from food_logs |
+| total_steps | integer | Sum from activity_logs |
+| total_activity_minutes | integer | Sum from activity_logs |
 
-**activity_logs table:**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| user_id | uuid | Reference to user |
-| activity_type | text | walking/exercise/physio/etc |
-| duration_minutes | integer | Duration |
-| intensity | text | low/medium/high |
-| notes | text | Additional details |
-| logged_via | text | 'voice' or 'manual' |
-| transcript | text | Original user speech |
-| created_at | timestamp | Log timestamp |
-
-**symptom_logs table:**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| user_id | uuid | Reference to user |
-| symptoms | jsonb | {nausea: 1-10, fatigue: 1-10, pain: 1-10, ...} |
-| safety_flags | text[] | fever/red_wound/severe_pain (triggers safety alert) |
-| ai_response | text | What ZorgAssistent advised |
-| logged_via | text | 'voice' or 'manual' |
-| transcript | text | Original user speech |
-| created_at | timestamp | Log timestamp |
-
-Each table will have RLS policies requiring user authentication.
+This enables fast lookups for the voice prompt injection.
 
 ---
 
-### 2. Edge Function for Ephemeral Token Generation
+### 4. Implement "Adherence Gap" Logic
 
-**New file:** `supabase/functions/openai-realtime-session/index.ts`
+**File:** `supabase/functions/openai-realtime-session/index.ts`
 
-This backend function:
-1. Receives request from authenticated client
-2. Calls OpenAI's `/v1/realtime/sessions` endpoint with your API key
-3. Returns an ephemeral token (valid 60 seconds) to the client
-4. Includes the ZorgAssistent persona instructions in the session config
+Add explicit instruction to the AI prompt:
 
-The session configuration will include:
-- Voice: A warm, empathetic voice suitable for patient care
-- Instructions: Full ZorgAssistent PatientVoice persona
-- Tools: `log_food`, `log_activity`, `log_symptom` function definitions
-
----
-
-### 3. Edge Function for Data Logging
-
-**New file:** `supabase/functions/voice-log-health/index.ts`
-
-This function handles the actual database inserts when the AI triggers tool calls:
-- Validates the incoming data
-- Checks for safety flags (fever, red wound, severe pain)
-- Stores the log in the appropriate table
-- Returns confirmation for the AI to speak back
-
----
-
-### 4. Voice Assistant React Component
-
-**New file:** `src/components/voice/VoiceAssistant.tsx`
-
-Core component with:
-- **Push-to-talk button**: Recording only while button is held (privacy-first)
-- **WebRTC connection management**: Uses RTCPeerConnection for low-latency audio
-- **Visual feedback**: Waveform animation during listening/speaking
-- **Status indicators**: Connected, Listening, Processing, Speaking
-- **Transcript display**: Shows what was heard and AI responses
-
-**New file:** `src/components/voice/VoiceButton.tsx`
-
-Floating action button component:
-- Fixed position at bottom-right of screen
-- Microphone icon with pulse animation when active
-- Expands to show VoiceAssistant when clicked
-- Accessible on all pages (Recovery section primarily)
-
----
-
-### 5. Voice Conversation Hook
-
-**New file:** `src/hooks/useVoiceConversation.ts`
-
-Custom hook managing:
-- Ephemeral token fetching
-- WebRTC peer connection setup
-- Audio stream handling (microphone input, AI output)
-- Data channel for events (tool calls, transcripts)
-- Connection state management
-- Cleanup on unmount
-
-Flow:
 ```text
-1. User holds microphone button
-2. Hook requests ephemeral token from edge function
-3. WebRTC connection established with OpenAI
-4. Audio streams bidirectionally
-5. AI triggers tool calls (log_food, etc.)
-6. Tool results sent back to AI
-7. AI confirms action verbally
-8. Connection closed when button released
+**CRITICAL - Adherence Gap Protocol:**
+Patients overestimate their protein intake. When they describe food:
+- Be conservative with estimates
+- If it sounds like 15g of protein, say 15g (do NOT round up)
+- Use NEVO 2023 values, not optimistic assumptions
+- Example: "1 egg = 6g protein" not "7-8g"
+```
+
+This makes the AI a stricter, more accurate nutritional scribe.
+
+---
+
+### 5. Fatigue-Aware Recipe Suggestions
+
+**File:** `supabase/functions/openai-realtime-session/index.ts`
+
+Add conditional logic to the prompt based on `contextType`:
+
+```text
+**Context-Specific Rules:**
+If contextType is 'cancer_support' OR 'energy_boost':
+  - Check if patient mentions fatigue or tiredness
+  - If yes, suggest "Seated Prep" recipes (minimal standing)
+  - Example: "Overweeg een maaltijd die je zittend kunt bereiden"
 ```
 
 ---
 
-### 6. AI Tool Definitions (Function Calling)
+### 6. Enhanced Tool Definitions
 
-The OpenAI Realtime session will have these tools configured:
+**File:** `supabase/functions/openai-realtime-session/index.ts`
 
-**log_food:**
+Upgrade tool parameters for more granular data:
+
+**log_food improvements:**
+- Add `protein_estimate_confidence`: "low" | "medium" | "high"
+- Add `data_source`: "patient_reported" | "nevo_lookup"
+
+**log_activity improvements:**
+- Add `step_count` parameter
+- Add `anabolic_window_timing`: "pre_meal" | "post_meal" | "unrelated"
+
+**log_symptom improvements:**
+- Add `sleep_quality` (1-10) for fatigue correlation
+- Add `suggested_action` for AI to record its own advice
+
+---
+
+### 7. Update Client to Fetch Daily Stats Before Connection
+
+**File:** `src/hooks/useVoiceConversation.ts`
+
+Before calling `openai-realtime-session`, query today's logs:
+
 ```text
-{
-  name: "log_food",
-  description: "Log food intake when patient mentions eating",
-  parameters: {
-    items: string[],
-    meal_type: "breakfast" | "lunch" | "dinner" | "snack",
-    estimated_protein_grams: number,
-    estimated_calories: number
-  }
-}
+1. Query food_logs for today -> sum protein, calories
+2. Query activity_logs for today -> sum steps, minutes
+3. Pass as dailyStats to edge function
+4. AI receives real-time context
 ```
 
-**log_activity:**
-```text
-{
-  name: "log_activity", 
-  description: "Log physical activity when patient mentions movement",
-  parameters: {
-    activity_type: string,
-    duration_minutes: number,
-    intensity: "low" | "medium" | "high"
-  }
-}
-```
-
-**log_symptom:**
-```text
-{
-  name: "log_symptom",
-  description: "Log symptoms when patient describes how they feel",
-  parameters: {
-    symptoms: { [symptom: string]: 1-10 },
-    safety_flags: string[] // "fever", "red_wound", "severe_pain"
-  }
-}
-```
+This ensures every conversation starts with accurate patient status.
 
 ---
 
-### 7. ZorgAssistent Persona Configuration
+### 8. Clinician Dashboard Enhancements
 
-The AI will be configured with these instructions:
+**File:** `src/components/recovery/ClinicianDashboard.tsx`
 
-**Core Identity:**
-- Name: ZorgAssistent
-- Role: Empathetic Dutch Recovery Companion
-- Tone: Warm, encouraging, clinically informed but patient-friendly
-- Language: Dutch or English based on user preference
+Add new sections based on specification:
 
-**Behavioral Rules:**
-- Always acknowledge what the patient said
-- Extract and log data silently (don't announce "I'm logging...")
-- Provide relevant tips from recovery protocols
-- Check protein intake against daily target
-- Immediately escalate safety concerns (fever, wound issues)
-
-**Context Awareness:**
-- Access to user's recovery goals (protein target, calorie target)
-- Knowledge of their selected challenge (nausea, cancer support, etc.)
-- References ERAS/ESPEN guidelines for advice
+**New Features:**
+- Steps tracking graph (if steps data exists)
+- "AI Suggested Actions" section (from `suggested_action` field)
+- Sleep quality correlation (if logged)
+- Weekly trend mini-charts using recharts
 
 ---
 
-### 8. Safety Net Protocol
+## Technical Details
 
-When the AI detects safety flags:
-
-**Trigger words:** "fever", "temperature", "hot", "red wound", "infected", "pus", "severe pain", "can't breathe"
-
-**Response:**
-1. AI immediately acknowledges concern
-2. Logs symptom with safety_flag=true
-3. Speaks clear escalation message: "I'm concerned about what you're describing. Please contact your care team or call [emergency number] right away."
-4. Optionally: Displays emergency contact card in UI
-
----
-
-### 9. Clinician Dashboard Component
-
-**New file:** `src/components/recovery/ClinicianDashboard.tsx`
-
-When Clinician Mode is enabled, show a new "Daily Rounding Summary" section:
-
-**Data Aggregation:**
-- Query food_logs, activity_logs, symptom_logs for the day
-- Calculate total protein vs. target
-- Aggregate symptoms into a cloud/list
-
-**Display Sections:**
-- **Nutritional Trend:** Progress bar and mini-chart (protein intake over time)
-- **Symptom Summary:** Tags showing reported symptoms with severity
-- **Activity Level:** Summary of movement (sedentary/light/active)
-- **AI Conversation Notes:** Key excerpts from voice interactions
-- **Safety Alerts:** Highlighted section if any flags were triggered
-
----
-
-### 10. Privacy & Consent Implementation
-
-**Consent Flow:**
-1. First time using voice: Show consent modal explaining what happens
-2. Explain: "Recording only while button held, audio is not stored"
-3. User must explicitly accept before microphone access is requested
-4. Store consent acknowledgment in localStorage
-
-**Privacy Features:**
-- Push-to-talk only (no always-listening)
-- Raw audio is streamed but not stored
-- Only transcripts/summaries are saved
-- User can delete their logs anytime
-
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `supabase/functions/openai-realtime-session/index.ts` | Generate ephemeral tokens |
-| `supabase/functions/voice-log-health/index.ts` | Handle AI tool calls, save logs |
-| `src/components/voice/VoiceAssistant.tsx` | Main voice interface component |
-| `src/components/voice/VoiceButton.tsx` | Floating microphone FAB |
-| `src/components/voice/VoiceWaveform.tsx` | Visual audio feedback |
-| `src/components/voice/VoiceConsentModal.tsx` | Privacy consent dialog |
-| `src/components/recovery/ClinicianDashboard.tsx` | Daily rounding summary |
-| `src/hooks/useVoiceConversation.ts` | WebRTC + Realtime API logic |
-
-## Files to Modify
-
+### Files to Modify:
 | File | Changes |
 |------|---------|
-| `src/pages/Recovery.tsx` | Add VoiceButton, add ClinicianDashboard for clinician mode |
-| `src/components/Navigation.tsx` | Optional: Add voice indicator |
-| `supabase/config.toml` | Add new edge functions |
+| `supabase/functions/openai-realtime-session/index.ts` | Dutch prompt, real-time stats injection, enhanced tools |
+| `src/hooks/useVoiceConversation.ts` | Fetch daily stats before connection |
+| `src/components/recovery/ClinicianDashboard.tsx` | Steps display, AI actions section |
+| `supabase/functions/voice-log-health/index.ts` | Handle new tool parameters |
+
+### Database Changes:
+- Add `step_count` column to `activity_logs`
+- Add `suggested_action` column to `symptom_logs`
+- Optional: Create `daily_summaries` table for fast aggregation
+
+### No New Dependencies Required
 
 ---
 
-## User Flow Summary
+## User Flow After Enhancement
 
 ```text
 Patient opens Recovery section
         |
         v
-Floating mic button visible in corner
+Opens Voice Assistant
         |
         v
-Patient holds button and speaks:
-"I had scrambled eggs and toast for breakfast"
+System fetches today's data:
+- Protein: 32g / 90g (36%)
+- Calories: 800 / 2000
+- Steps: 500 / 2000
         |
         v
-ZorgAssistent responds:
-"Great choice! That's about 18g of protein. 
-You're at 35% of your daily target. Keep it up!"
-        |
-   (Behind scenes: log_food tool called, 
-    data saved to food_logs table)
+ZorgAssistent greets in Dutch:
+"Goedemorgen! Je zit nu op 36% van je eiwit. 
+Wat heb je vandaag al gegeten?"
         |
         v
-Later, patient says:
-"I feel really tired and a bit dizzy"
+Patient: "Ik heb twee eieren gegeten"
         |
         v
-ZorgAssistent responds:
-"I understand, fatigue can be common during recovery.
-Make sure you're staying hydrated. How's your pain level?"
+ZorgAssistent (strict estimate):
+"Prima! Dat is ongeveer 12 gram eiwit. 
+Je staat nu op 44g - nog 46g te gaan.
+Overweeg kwark als tussendoortje?"
         |
-   (Behind scenes: log_symptom called with 
-    fatigue=high, dizziness=moderate)
-        |
-        v
-Clinician enables Clinician Mode
-        |
-        v
-Dashboard shows:
-- Protein: 45g / 90g target
-- Symptoms: fatigue (high), dizziness (moderate)
-- Activity: Light (10 min walking)
-- AI Notes: "Suggested hydration for fatigue"
+   (Behind scenes: log_food with 
+    estimated_protein: 12, confidence: "high")
 ```
 
 ---
 
-## API Key Setup
+## Summary of Improvements
 
-During implementation, you'll be prompted to add your OpenAI API key:
-
-1. Go to [OpenAI Platform](https://platform.openai.com)
-2. Create an API key with Realtime API access
-3. When prompted in Lovable, enter your key as `OPENAI_API_KEY`
-
-The key will be stored securely as a backend secret and never exposed to the client.
-
----
-
-## Notes on Cost & Usage
-
-- OpenAI Realtime API is billed per minute of audio
-- Ephemeral tokens have 60-second TTL for security
-- Push-to-talk design minimizes accidental usage
-- Consider adding usage tracking/limits for production
+1. **Dutch-First Personality** - Complete NL-only persona with short, spoken responses
+2. **Real-Time Context** - AI knows current protein/calorie/step progress
+3. **Strict Nutrition Tracking** - "Adherence Gap" protocol prevents over-estimation
+4. **Smart Suggestions** - Context-aware tips (seated prep, snacks, hydration)
+5. **Enhanced Logging** - More granular data for clinical insights
+6. **Steps Integration** - Track mobility alongside nutrition
 
