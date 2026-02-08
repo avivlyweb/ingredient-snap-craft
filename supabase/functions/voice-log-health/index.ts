@@ -107,6 +107,67 @@ serve(async (req) => {
         break;
       }
 
+      case "activity_check_in": {
+        // Wearable-free activity check-in
+        const { 
+          movement_moments, 
+          longest_sitting_streak_min, 
+          fatigue_score,
+          pain_score,
+          sleep_hours,
+          activity_state 
+        } = data;
+        
+        const { data: insertedData, error } = await supabaseClient
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            activity_type: "daily_check_in",
+            movement_moments: movement_moments,
+            longest_sitting_streak_min: longest_sitting_streak_min,
+            fatigue_score: fatigue_score,
+            pain_score: pain_score || null,
+            sleep_hours: sleep_hours || null,
+            activity_state: activity_state,
+            logged_via: "voice",
+            transcript: transcript
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = { 
+          success: true, 
+          message: `Activity check-in logged: ${activity_state}`,
+          activityState: activity_state,
+          data: insertedData
+        };
+        break;
+      }
+
+      case "cognitive_light_mode": {
+        // Trigger cognitive light mode
+        const { reason, duration_hours = 24 } = data;
+        
+        // Update user profile to enable cognitive light mode
+        const { error } = await supabaseClient
+          .from("profiles")
+          .update({
+            cognitive_light_mode: true
+          })
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+        
+        result = { 
+          success: true, 
+          message: `Cognitive Light Mode activated for ${duration_hours} hours`,
+          reason: reason,
+          expiresAt: new Date(Date.now() + duration_hours * 60 * 60 * 1000).toISOString()
+        };
+        break;
+      }
+
       case "symptom": {
         const { 
           symptoms, 

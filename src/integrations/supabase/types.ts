@@ -16,37 +16,58 @@ export type Database = {
     Tables: {
       activity_logs: {
         Row: {
+          activity_state: string | null
           activity_type: string
           created_at: string
           duration_minutes: number | null
+          fatigue_score: number | null
           id: string
           intensity: string | null
           logged_via: string
+          longest_sitting_streak_min: number | null
+          movement_moments: number | null
           notes: string | null
+          pain_score: number | null
+          perceived_exertion_rpe: number | null
+          sleep_hours: number | null
           step_count: number | null
           transcript: string | null
           user_id: string
         }
         Insert: {
+          activity_state?: string | null
           activity_type: string
           created_at?: string
           duration_minutes?: number | null
+          fatigue_score?: number | null
           id?: string
           intensity?: string | null
           logged_via?: string
+          longest_sitting_streak_min?: number | null
+          movement_moments?: number | null
           notes?: string | null
+          pain_score?: number | null
+          perceived_exertion_rpe?: number | null
+          sleep_hours?: number | null
           step_count?: number | null
           transcript?: string | null
           user_id: string
         }
         Update: {
+          activity_state?: string | null
           activity_type?: string
           created_at?: string
           duration_minutes?: number | null
+          fatigue_score?: number | null
           id?: string
           intensity?: string | null
           logged_via?: string
+          longest_sitting_streak_min?: number | null
+          movement_moments?: number | null
           notes?: string | null
+          pain_score?: number | null
+          perceived_exertion_rpe?: number | null
+          sleep_hours?: number | null
           step_count?: number | null
           transcript?: string | null
           user_id?: string
@@ -216,8 +237,11 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          cognitive_light_mode: boolean | null
           created_at: string
           id: string
+          recovery_status: string | null
+          surgery_date: string | null
           updated_at: string
           user_id: string
           username: string
@@ -225,8 +249,11 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          cognitive_light_mode?: boolean | null
           created_at?: string
           id?: string
+          recovery_status?: string | null
+          surgery_date?: string | null
           updated_at?: string
           user_id: string
           username: string
@@ -234,8 +261,11 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          cognitive_light_mode?: boolean | null
           created_at?: string
           id?: string
+          recovery_status?: string | null
+          surgery_date?: string | null
           updated_at?: string
           user_id?: string
           username?: string
