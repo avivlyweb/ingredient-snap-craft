@@ -184,6 +184,39 @@ export function ClinicianDashboard({ proteinTarget, calorieTarget, stepTarget = 
 
   useEffect(() => {
     fetchTodayLogs();
+
+    // Subscribe to realtime updates for all health log tables
+    const channel = supabase
+      .channel('health-logs-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'food_logs' },
+        () => {
+          console.log('New food log detected, refreshing...');
+          fetchTodayLogs();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'activity_logs' },
+        () => {
+          console.log('New activity log detected, refreshing...');
+          fetchTodayLogs();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'symptom_logs' },
+        () => {
+          console.log('New symptom log detected, refreshing...');
+          fetchTodayLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Calculate totals
