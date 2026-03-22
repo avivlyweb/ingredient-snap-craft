@@ -72,8 +72,6 @@ serve(async (req) => {
       throw new Error("No image generated");
     }
 
-    // Extract base64 data and upload to storage
-    const base64Data = base64ImageUrl.replace(/^data:image\/\w+;base64,/, '');
     const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
     // Create Supabase client with service role
