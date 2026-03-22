@@ -30,27 +30,24 @@ serve(async (req) => {
 
     const prompt = `Professional food photography of ${recipeTitle}, ${cuisineStyle} cuisine, beautifully plated dish featuring ${ingredients.slice(0, 3).join(', ')}, studio lighting, high resolution, appetizing presentation, garnished, restaurant quality, shallow depth of field`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        modalities: ["image", "text"]
+        model: "dall-e-3",
+        prompt: prompt,
+        n: 1,
+        size: "1024x1024",
+        response_format: "b64_json",
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("OpenAI error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -65,13 +62,13 @@ serve(async (req) => {
         );
       }
       
-      throw new Error("AI gateway error");
+      throw new Error("OpenAI image generation error");
     }
 
     const data = await response.json();
-    const base64ImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const base64Data = data.data?.[0]?.b64_json;
     
-    if (!base64ImageUrl) {
+    if (!base64Data) {
       throw new Error("No image generated");
     }
 
