@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Frown, Utensils, Zap, Clock, Shield } from "lucide-react";
 
@@ -27,8 +27,8 @@ const recoveryContexts: RecoveryContext[] = [
       "Cold or room temperature foods are often better tolerated",
       "Small, frequent meals instead of large portions",
       "Avoid strong smells and greasy foods",
-      "Ginger and citrus can help settle the stomach"
-    ]
+      "Ginger and citrus can help settle the stomach",
+    ],
   },
   {
     id: "low_appetite",
@@ -40,8 +40,8 @@ const recoveryContexts: RecoveryContext[] = [
       "Focus on calorie and protein density in smaller portions",
       "Fortify foods with protein powder or Greek yogurt",
       "Eat during windows when appetite is best",
-      "Make every bite count nutritionally"
-    ]
+      "Make every bite count nutritionally",
+    ],
   },
   {
     id: "energy_boost",
@@ -53,8 +53,8 @@ const recoveryContexts: RecoveryContext[] = [
       "Balance complex carbs with protein for sustained energy",
       "Include iron-rich foods to combat fatigue",
       "Stay hydrated—dehydration worsens tiredness",
-      "Small, frequent meals maintain energy levels"
-    ]
+      "Small, frequent meals maintain energy levels",
+    ],
   },
   {
     id: "easy_prep",
@@ -66,8 +66,8 @@ const recoveryContexts: RecoveryContext[] = [
       "Batch cook when feeling well",
       "Keep nutritious ready-to-eat options available",
       "Accept help from family and friends",
-      "Prioritize rest—nutrition supports healing"
-    ]
+      "Prioritize rest—nutrition supports healing",
+    ],
   },
   {
     id: "cancer_support",
@@ -79,9 +79,9 @@ const recoveryContexts: RecoveryContext[] = [
       "Prioritize food safety (cooked > raw) for low immunity",
       "Focus on protein & zinc for surgical wound healing",
       "Manage side effects like mucositis or taste changes",
-      "Immunonutrition with Arginine & Omega-3s supports recovery"
-    ]
-  }
+      "Immunonutrition with Arginine & Omega-3s supports recovery",
+    ],
+  },
 ];
 
 const RecoveryContextSelection = ({ onSelectContext, selectedContext }: RecoveryContextSelectionProps) => {
@@ -94,16 +94,21 @@ const RecoveryContextSelection = ({ onSelectContext, selectedContext }: Recovery
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="radiogroup" aria-label="Recovery challenge">
         {recoveryContexts.map((context) => (
-          <Card
+          <button
             key={context.id}
-            className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${
-              selectedContext === context.id ? "border-primary border-2 bg-primary/5" : ""
+            type="button"
+            role="radio"
+            aria-checked={selectedContext === context.id}
+            className={`text-left p-6 rounded-lg border transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              selectedContext === context.id
+                ? "border-primary border-2 bg-primary/5"
+                : "border-border bg-card hover:border-primary/50"
             }`}
             onClick={() => onSelectContext(context.id)}
           >
-            <CardHeader className="pb-2">
+            <div className="pb-2">
               <div className="flex items-center justify-between">
                 <div className={`p-2 rounded-lg bg-muted ${context.color}`}>
                   {context.icon}
@@ -114,8 +119,8 @@ const RecoveryContextSelection = ({ onSelectContext, selectedContext }: Recovery
               </div>
               <CardTitle className="text-lg mt-2">{context.label}</CardTitle>
               <CardDescription>{context.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <ul className="text-xs text-muted-foreground space-y-1">
                 {context.tips.slice(0, 2).map((tip, index) => (
                   <li key={index} className="flex items-start gap-2">
@@ -124,8 +129,8 @@ const RecoveryContextSelection = ({ onSelectContext, selectedContext }: Recovery
                   </li>
                 ))}
               </ul>
-            </CardContent>
-          </Card>
+            </div>
+          </button>
         ))}
       </div>
     </div>
