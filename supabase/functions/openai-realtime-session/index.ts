@@ -8,6 +8,7 @@ const corsHeaders = {
 
 // Activity state types
 type ActivityState = 'ADEQUATE' | 'UNDERSTIMULATED' | 'STALLING' | 'FATIGUE_LIMITED' | 'OVERREACHED' | 'DATA_SPARSE';
+type AdviceMode = "coach" | "specific_action" | "escalate";
 
 // Dutch response phrases for activity states
 const ACTIVITY_STATE_RESPONSES_NL: Record<ActivityState, string> = {
@@ -26,7 +27,11 @@ function buildZorgAssistentPrompt(
   contextType: string,
   userName: string,
   recoveryStatus: string = 'post_op',
-  postOpWeek: number = 1
+  postOpWeek: number = 1,
+  allowedAdviceMode: AdviceMode = "coach",
+  allowedActionKey: string = "keep_checking_in",
+  allowedRationale: string = "Gebruik warme coaching en logging als standaard.",
+  sourceIds: string[] = []
 ): string {
   const proteinPercent = Math.round((dailyStats.protein / targets.proteinTarget) * 100);
   const caloriePercent = Math.round((dailyStats.calories / targets.calorieTarget) * 100);
@@ -48,18 +53,26 @@ function buildZorgAssistentPrompt(
     ? { moments: 7, walks: 3, activeMin: 20, targetPercent: 75 }
     : { moments: 8, walks: 4, activeMin: 25, targetPercent: 100 };
 
-  return `Je bent ZorgAssistent, een Nederlandstalige spraakassistent die patiënten ondersteunt bij het herstel na een operatie aan het maag-darmkanaal of de longen in Amsterdam UMC.
+  return `Je bent ZorgAssistent, een Nederlandstalige herstelbuddy voor patiënten na een operatie aan het maag-darmkanaal of de longen in Amsterdam UMC.
 
-### Jouw Rol:
+### Rol en Toon:
 - **Korte, gesproken antwoorden** (Max 3 zinnen)
 - **Taal:** Enkel in het Nederlands
-- **Toon:** Ondersteunend, motiverend, en waarderend
+- **Toon:** Ondersteunend, motiverend, warm en praktisch
+- Je biedt **ondersteunende begeleiding**, geen vervanging van het zorgteam
 
+### Adviesmodus:
+- Toegestane modus: ${allowedAdviceMode}
+- Toegestane actie: ${allowedActionKey}
+- Reden: ${allowedRationale}
+- Bronverwijzingen: ${sourceIds.length > 0 ? sourceIds.join(", ") : "geen expliciete bron meegegeven"}
 
-### Context & Regels (ReasoningCore v4):
-- **Voeding:** Als eiwit < 50% van doel, adviseer een snack (kwark, noten, ei)
-- **Beweging:** Als stappen laag zijn, adviseer een kleine wandeling
-- **Slaap:** Koppel slechte slaap aan advies voor rust
+### Adviesregels:
+- In modus **coach** geef je alleen coaching, samenvatting, check-in vragen en zachte suggesties
+- In modus **specific_action** mag je precies EEN concrete, kleine actie adviseren die past bij de toegestane actie
+- In modus **escalate** geef je geen workaround, maar stuur je direct naar het zorgteam
+- Noem geen evidence grades, verborgen zekerheden of niet-gecontroleerde medische claims
+- Presenteer jezelf nooit als definitieve medische autoriteit
 
 ### LOGGING (VERPLICHT):
 - Als de patiënt **eten of drinken** noemt: roep **ALTIJD** eerst de tool "log_food" aan (met conservatieve schatting), en geef daarna je reactie.
@@ -69,7 +82,7 @@ function buildZorgAssistentPrompt(
 - Als je Cognitive Light Mode activeert: roep de tool "trigger_cognitive_light_mode" aan.
 - Als info ontbreekt (bijv. geen duur/hoeveelheid): log alsnog met wat je wél weet; laat velden weg die je niet zeker weet.
 
-### KRITISCH - Adherence Gap Protocol:
+### Conservatieve Logging:
 Patiënten overschatten hun eiwitinname. Wanneer zij voedsel beschrijven:
 - Wees conservatief met schattingen
 - Als het klinkt als 15g eiwit, zeg dan 15g (NIET naar boven afronden)
@@ -121,9 +134,10 @@ Reactie: "Ik maak me zorgen over wat je beschrijft. Neem alsjeblieft direct cont
 ### Gedragsregels:
 - Erken altijd warm wat de patiënt zei
 - Geef korte, motiverende reacties (geen lezingen)
-- Bij eten: schat eiwitgehalte en moedig vooruitgang aan
+- Bij eten: schat eiwitgehalte conservatief en moedig vooruitgang aan
 - Bij activiteit: prijs elke beweging, vooral wandelen
 - Bij symptomen: toon eerst empathie, log dan
+- Als de modus **specific_action** is, koppel je reactie aan de vrijgegeven actie en niet aan eigen improvisatie
 
 ### Voorbeeld Interacties:
 
@@ -136,7 +150,7 @@ Jij: "Fantastisch! Elke stap helpt je herstel. Je lichaam wordt sterker. Hoe voe
 Patiënt: "Ik voel me heel moe en een beetje misselijk"
 Jij: "Dat begrijp ik - vermoeidheid en misselijkheid zijn normaal in de eerste dagen. Probeer kleine slokjes gemberthee of water. Als de misselijkheid erger wordt, laat je zorgteam weten."
 
-**Je doel:** Help ${userName || 'de patiënt'} hun dagdoelen te halen met simpele, praktische stappen.`;
+**Je doel:** Help ${userName || 'de patiënt'} met simpele, praktische en veilige herstelstappen die passen binnen de toegestane adviesmodus.`;
 }
 
 // Enhanced tool definitions with granular data tracking
@@ -319,7 +333,11 @@ serve(async (req) => {
       voice = "shimmer", 
       recoveryContext,
       dailyStats = { protein: 0, calories: 0, steps: 0, activityMinutes: 0 },
-      userName = "Patiënt"
+      userName = "Patiënt",
+      allowedAdviceMode = "coach",
+      allowedActionKey = "keep_checking_in",
+      allowedRationale = "Gebruik warme coaching en logging als standaard.",
+      sourceIds = []
     } = body;
 
     // Set targets from context or defaults
@@ -340,7 +358,11 @@ serve(async (req) => {
       recoveryContext?.contextType || "general",
       userName,
       recoveryStatus,
-      postOpWeek
+      postOpWeek,
+      allowedAdviceMode,
+      allowedActionKey,
+      allowedRationale,
+      sourceIds
     );
 
     // Create ephemeral session with OpenAI Realtime API

@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { PatientDaySnapshot, RuleEvaluation } from "@/types/recoveryReasoning";
+import { evaluateRecoveryRules } from "@/utils/recoveryRuleEngine";
 
 interface DailyStats {
   protein: number;
@@ -28,6 +30,7 @@ interface VoiceConversationState {
   isConnecting: boolean;
   error: string | null;
   dailyStats: DailyStats;
+  ruleEvaluation: RuleEvaluation | null;
 }
 
 // Fetch today's aggregated stats from the database
@@ -82,8 +85,21 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
     isConnecting: false,
     error: null,
     dailyStats: { protein: 0, calories: 0, steps: 0, activityMinutes: 0 },
+    ruleEvaluation: null,
   });
 
+  const buildPatientDaySnapshot = useCallback(
+    (dailyStats: DailyStats): PatientDaySnapshot => ({
+      proteinActualG: dailyStats.protein,
+      proteinTargetG: options.recoveryContext?.proteinTarget,
+      calorieActualKcal: dailyStats.calories,
+      calorieTargetKcal: options.recoveryContext?.calorieTarget,
+      stepsActual: dailyStats.steps,
+      stepTarget: options.recoveryContext?.stepTarget,
+      activityMinutes: dailyStats.activityMinutes,
+    }),
+    [options.recoveryContext]
+  );
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -114,6 +130,7 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
       isConnected: false,
       isListening: false,
       isSpeaking: false,
+      ruleEvaluation: null,
     }));
   }, []);
 
@@ -200,8 +217,7 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
 
       if (session?.user) {
         dailyStats = await fetchTodayStats(session.user.id);
-        setState(prev => ({ ...prev, dailyStats }));
-        
+
         // Try to get user name from profile
         const { data: profile } = await supabase
           .from("profiles")
@@ -214,6 +230,10 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
         }
       }
 
+      const patientDaySnapshot = buildPatientDaySnapshot(dailyStats);
+      const ruleEvaluation = evaluateRecoveryRules(patientDaySnapshot);
+      setState(prev => ({ ...prev, dailyStats, ruleEvaluation }));
+
       // Get ephemeral token from edge function with daily stats
       const { data: sessionData, error: sessionError } = await supabase.functions.invoke(
         "openai-realtime-session",
@@ -223,6 +243,10 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
             recoveryContext: options.recoveryContext,
             dailyStats,
             userName,
+            allowedAdviceMode: ruleEvaluation.adviceMode,
+            allowedActionKey: ruleEvaluation.actionKey,
+            allowedRationale: ruleEvaluation.rationale,
+            sourceIds: ruleEvaluation.sourceIds,
           },
         }
       );
@@ -369,7 +393,7 @@ export function useVoiceConversation(options: VoiceConversationOptions = {}) {
       }));
       options.onError?.(error instanceof Error ? error : new Error("Connection failed"));
     }
-  }, [cleanup, handleToolCall, options]);
+  }, [buildPatientDaySnapshot, cleanup, handleToolCall, options]);
 
   // Disconnect from the session
   const disconnect = useCallback(() => {

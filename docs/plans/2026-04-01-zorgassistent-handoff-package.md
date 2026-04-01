@@ -318,6 +318,26 @@ Required change:
 - every recommendation should map to one or more `reasoning_rules`
 - `Grade A/B/C` should not be shown unless grounded in a stored source decision
 
+## Voice Advice Policy
+
+The voice assistant should use three explicit advice modes:
+
+- `coach`
+- `specific_action`
+- `escalate`
+
+Specific action advice is allowed only when a rule evaluation explicitly unlocks it.
+
+Examples:
+
+- `eat_protein_now`
+- `take_small_energy_dense_snack`
+- `walk_3_minutes_now`
+- `drink_now`
+- `contact_care_team_now`
+
+The LLM may handle tone and phrasing, but the allowed action and escalation boundary should come from structured rule evaluation rather than prompt improvisation.
+
 ## Initial Rule Candidates
 
 ### Rule: low protein intake
