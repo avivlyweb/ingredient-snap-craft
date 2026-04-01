@@ -71,6 +71,9 @@ NUTRITIONAL OPTIMIZATION GUIDELINES:
 ${isRecoveryContext ? `
 EVIDENCE-BASED PRACTICE RULES (ZorgAssistent Protocols):
 - Protein Targets: Strictly adhere to 1.5g/kg target for post-operative recovery (Ref: ESPEN guidelines for surgical patients)
+${recoveryGoals?.weight ? `- PATIENT WEIGHT: ${recoveryGoals.weight}kg => Daily protein target: ${(recoveryGoals.weight * 1.5).toFixed(0)}g (${(recoveryGoals.weight * 1.5 / 3).toFixed(0)}g per meal)` : ''}
+${recoveryGoals?.proteinTarget ? `- CUSTOM PROTEIN TARGET: ${recoveryGoals.proteinTarget}g/day` : ''}
+${recoveryGoals?.calorieTarget ? `- CALORIE TARGET: ${recoveryGoals.calorieTarget} kcal/day` : ''}
 - Data Source: Prioritize NEVO 2023 (v8.0) nutritional values where possible
 - For cancer_support context: Apply immunonutrition principles, prioritize Arginine/Omega-3s as per ERAS protocols
 - Generate DUAL-LAYER INSIGHTS for both patients and clinicians
