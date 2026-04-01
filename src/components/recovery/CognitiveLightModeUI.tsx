@@ -3,6 +3,7 @@
  * 
  * Simplified "Low Power Mode" for patients experiencing chemo brain/brain fog.
  * Removes clutter, shows only one task at a time, prioritizes voice interaction.
+ * Actions now log real data to the database for dashboard tracking.
  */
 
 import { useState } from "react";
@@ -12,11 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mic, Utensils, Footprints, Moon, ChevronRight, Check } from "lucide-react";
 import { VoiceButton } from "@/components/voice/VoiceButton";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface CognitiveLightModeUIProps {
   userName?: string;
-  proteinProgress: number; // 0-100
-  stepsProgress: number; // 0-100
+  proteinProgress: number;
+  stepsProgress: number;
   onExitLightMode: () => void;
   recoveryContext?: {
     proteinTarget: number;
@@ -28,6 +31,20 @@ interface CognitiveLightModeUIProps {
 
 type SimpleTask = 'eat' | 'move' | 'rest' | null;
 
+// Estimated nutrition for simple snack options
+const snackNutrition: Record<string, { protein: number; calories: number }> = {
+  "Kwark": { protein: 12, calories: 80 },
+  "Gekookt ei": { protein: 7, calories: 78 },
+  "Noten": { protein: 6, calories: 170 },
+};
+
+// Estimated activity for movement options
+const movementEstimates: Record<string, { minutes: number; steps: number }> = {
+  "Naar de keuken": { minutes: 2, steps: 50 },
+  "Door de gang": { minutes: 5, steps: 150 },
+  "Even staan": { minutes: 3, steps: 10 },
+};
+
 export function CognitiveLightModeUI({
   userName = "Patiënt",
   proteinProgress,
@@ -37,8 +54,8 @@ export function CognitiveLightModeUI({
 }: CognitiveLightModeUIProps) {
   const [currentTask, setCurrentTask] = useState<SimpleTask>(null);
   const [taskCompleted, setTaskCompleted] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
 
-  // Determine suggested task based on progress
   const getSuggestedTask = (): SimpleTask => {
     if (proteinProgress < 50) return 'eat';
     if (stepsProgress < 50) return 'move';
@@ -76,7 +93,62 @@ export function CognitiveLightModeUI({
     setTaskCompleted(false);
   };
 
-  const handleTaskComplete = () => {
+  const handleTaskComplete = async (option: string) => {
+    setIsLogging(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Log in om je voortgang bij te houden");
+        setIsLogging(false);
+        return;
+      }
+
+      if (currentTask === 'eat') {
+        const nutrition = snackNutrition[option] || { protein: 5, calories: 80 };
+        const { error } = await supabase.from('food_logs').insert({
+          user_id: user.id,
+          items: [option],
+          estimated_protein: nutrition.protein,
+          estimated_calories: nutrition.calories,
+          meal_type: 'snack',
+          logged_via: 'cognitive_light_mode',
+          protein_confidence: 'estimated',
+          data_source: 'patient_reported',
+        });
+        if (error) throw error;
+        toast.success(`${option} gelogd — ${nutrition.protein}g eiwit`);
+      } else if (currentTask === 'move') {
+        const activity = movementEstimates[option] || { minutes: 3, steps: 50 };
+        const { error } = await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          activity_type: 'walking',
+          duration_minutes: activity.minutes,
+          step_count: activity.steps,
+          intensity: 'light',
+          logged_via: 'cognitive_light_mode',
+          notes: option,
+        });
+        if (error) throw error;
+        toast.success(`${option} gelogd — ${activity.minutes} min beweging`);
+      } else if (currentTask === 'rest') {
+        const { error } = await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          activity_type: 'rest',
+          duration_minutes: 10,
+          intensity: 'rest',
+          logged_via: 'cognitive_light_mode',
+          notes: option,
+        });
+        if (error) throw error;
+        toast.success("Rustmoment gelogd ✨");
+      }
+    } catch (err) {
+      console.error('Light mode log error:', err);
+      toast.error("Kon niet opslaan, probeer opnieuw");
+    }
+
+    setIsLogging(false);
     setTaskCompleted(true);
     setTimeout(() => {
       setCurrentTask(null);
@@ -107,7 +179,6 @@ export function CognitiveLightModeUI({
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-sm space-y-6"
         >
-          {/* Single prominent action button */}
           <Card className="border-2 border-primary/30">
             <CardContent className="p-8 text-center space-y-4">
               <p className="text-lg text-muted-foreground">
@@ -126,7 +197,7 @@ export function CognitiveLightModeUI({
                       key={task}
                       variant={isSuggested ? "default" : "outline"}
                       size="lg"
-                      className={`h-16 text-lg justify-start gap-4 ${isSuggested ? '' : ''}`}
+                      className="h-16 text-lg justify-start gap-4"
                       onClick={() => handleTaskSelect(task)}
                     >
                       <div className={`w-10 h-10 rounded-full ${info.color} flex items-center justify-center`}>
@@ -145,17 +216,13 @@ export function CognitiveLightModeUI({
             </CardContent>
           </Card>
 
-          {/* Voice button - primary interaction */}
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-muted-foreground">
               Of praat met me
             </p>
-            <VoiceButton
-              recoveryContext={recoveryContext}
-            />
+            <VoiceButton recoveryContext={recoveryContext} />
           </div>
 
-          {/* Exit light mode */}
           <Button
             variant="ghost"
             size="sm"
@@ -166,7 +233,6 @@ export function CognitiveLightModeUI({
           </Button>
         </motion.div>
       ) : (
-        // Task detail view
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -187,7 +253,6 @@ export function CognitiveLightModeUI({
                 </motion.div>
               ) : (
                 <>
-                  {/* Task header */}
                   <div className="text-center space-y-2">
                     <div className={`w-16 h-16 mx-auto rounded-full ${taskInfo[currentTask].color} flex items-center justify-center`}>
                       {(() => {
@@ -199,14 +264,14 @@ export function CognitiveLightModeUI({
                     <p className="text-muted-foreground">{taskInfo[currentTask].subtitle}</p>
                   </div>
 
-                  {/* Simple options */}
                   <div className="space-y-2">
                     {taskInfo[currentTask].options.map((option, i) => (
                       <Button
                         key={i}
                         variant="outline"
                         className="w-full h-14 text-lg justify-between"
-                        onClick={handleTaskComplete}
+                        onClick={() => handleTaskComplete(option)}
+                        disabled={isLogging}
                       >
                         {option}
                         <ChevronRight className="w-5 h-5" />
@@ -214,7 +279,6 @@ export function CognitiveLightModeUI({
                     ))}
                   </div>
 
-                  {/* Back button */}
                   <Button
                     variant="ghost"
                     onClick={() => setCurrentTask(null)}
@@ -229,7 +293,7 @@ export function CognitiveLightModeUI({
         </motion.div>
       )}
 
-      {/* Simple progress indicators at bottom */}
+      {/* Simple progress indicators */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
