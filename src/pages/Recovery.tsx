@@ -268,6 +268,38 @@ const Recovery = () => {
     setIngredients([]);
     setCurrentRecipe(null);
     setAddedToGallery(false);
+    setLoggedAsEaten(false);
+  };
+
+  const handleLogAsEaten = async () => {
+    if (!currentRecipe || !user) {
+      toast.error("Please sign in to log meals");
+      return;
+    }
+
+    setIsLoggingAsEaten(true);
+    try {
+      const { error } = await supabase.from("food_logs").insert({
+        user_id: user.id,
+        items: currentRecipe.ingredients,
+        meal_type: "meal",
+        estimated_protein: currentRecipe.nutrition?.protein || 0,
+        estimated_calories: currentRecipe.nutrition?.calories || 0,
+        logged_via: "recipe",
+        protein_confidence: "medium",
+        data_source: "recipe_generated",
+      });
+
+      if (error) throw error;
+
+      setLoggedAsEaten(true);
+      toast.success("Maaltijd gelogd! Je Herstelindex wordt bijgewerkt.");
+    } catch (error) {
+      console.error("Error logging meal:", error);
+      toast.error("Kon maaltijd niet loggen. Probeer opnieuw.");
+    } finally {
+      setIsLoggingAsEaten(false);
+    }
   };
 
   const handleAddToGallery = async () => {
