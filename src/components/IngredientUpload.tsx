@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,10 +22,8 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
       toast.error("You can only upload up to 3 images");
       return;
     }
-
+    setError(null);
     setSelectedFiles(prev => [...prev, ...files]);
-    
-    // Create previews
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -46,43 +45,35 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
     }
 
     setIsUploading(true);
+    setError(null);
     try {
-      // Upload images to storage
       const uploadedUrls: string[] = [];
-      
       for (const file of selectedFiles) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const { data, error } = await supabase.storage
           .from('ingredient-images')
           .upload(fileName, file);
-
         if (error) throw error;
-
         const { data: { publicUrl } } = supabase.storage
           .from('ingredient-images')
           .getPublicUrl(data.path);
-
         uploadedUrls.push(publicUrl);
       }
 
-      // Call AI to extract ingredients
       const { data, error } = await supabase.functions.invoke('extract-ingredients', {
         body: { images: uploadedUrls }
       });
-
       if (error) throw error;
-
       if (data?.error) {
-        toast.error(data.error);
+        setError(data.error);
         return;
       }
-
       toast.success("Ingredients extracted successfully!");
       onIngredientsExtracted(data.ingredients, uploadedUrls);
-    } catch (error) {
-      console.error('Error extracting ingredients:', error);
-      toast.error("Failed to extract ingredients. Please try again.");
+    } catch (err) {
+      console.error('Error extracting ingredients:', err);
+      setError("Failed to extract ingredients. Please try again or add them manually.");
     } finally {
       setIsUploading(false);
     }
@@ -90,6 +81,13 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
 
   const handleSkipToManual = () => {
     onIngredientsExtracted([], []);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
   };
 
   return (
@@ -102,11 +100,15 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
           multiple
           onChange={handleFileSelect}
           className="hidden"
+          id="ingredient-upload"
         />
-        
-        <div 
+
+        <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="cursor-pointer text-center space-y-4"
+          onKeyDown={handleKeyDown}
+          className="w-full text-center space-y-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg p-4"
+          aria-label="Upload ingredient photos"
         >
           <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
             <Upload className="w-10 h-10 text-primary" />
@@ -114,33 +116,55 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
           <div>
             <h3 className="text-xl font-semibold mb-2">Upload Your Ingredients</h3>
             <p className="text-muted-foreground">
-              Click to upload 1-3 photos of your ingredients
+              Click or press Enter to upload 1–3 photos of your ingredients
             </p>
           </div>
-        </div>
+        </button>
       </Card>
 
       {previews.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {previews.map((preview, index) => (
-            <div key={index} className="relative group">
+            <div key={index} className="relative">
               <img
                 src={preview}
                 alt={`Ingredient ${index + 1}`}
                 className="w-full h-32 object-cover rounded-lg shadow-md"
               />
-              <button
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7"
                 onClick={() => removeImage(index)}
-                className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label={`Remove image ${index + 1}`}
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
       )}
 
-      {selectedFiles.length > 0 && (
+      {/* Inline error state */}
+      {error && (
+        <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30 text-sm">
+          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <p className="text-destructive font-medium">{error}</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleExtract}>
+                Retry
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleSkipToManual}>
+                Add manually instead
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedFiles.length > 0 && !error && (
         <Button
           onClick={handleExtract}
           disabled={isUploading}
@@ -153,7 +177,7 @@ export const IngredientUpload = ({ onIngredientsExtracted }: IngredientUploadPro
               Extracting Ingredients...
             </>
           ) : (
-          "Extract Ingredients"
+            "Extract Ingredients"
           )}
         </Button>
       )}

@@ -1,18 +1,17 @@
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Heart, 
-  Users, 
-  Clock, 
-  Utensils, 
-  DollarSign, 
+import { Button } from "@/components/ui/button";
+import {
+  Heart,
+  Users,
+  Clock,
+  Utensils,
+  DollarSign,
   Dumbbell,
   Leaf,
   Target,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 interface ContextOption {
   id: string;
@@ -27,48 +26,12 @@ interface NutritionEnhancedContextSelectionProps {
 }
 
 const contextOptions: ContextOption[] = [
-  {
-    id: "date_night",
-    label: "Date Night",
-    description: "Romantic, impressive dining experience",
-    icon: Heart,
-    nutritionalFocus: "Mood-enhancing nutrients, moderate portions"
-  },
-  {
-    id: "family_dinner",
-    label: "Family Dinner",
-    description: "Wholesome meals for the whole family",
-    icon: Users,
-    nutritionalFocus: "Balanced nutrition, kid-friendly"
-  },
-  {
-    id: "quick_lunch",
-    label: "Quick Weeknight",
-    description: "Fast, energizing meals under 30 min",
-    icon: Clock,
-    nutritionalFocus: "Quick energy, sustained fuel"
-  },
-  {
-    id: "meal_prep",
-    label: "Meal Prep",
-    description: "Batch cooking for the week ahead",
-    icon: Utensils,
-    nutritionalFocus: "Consistent macros, protein-rich"
-  },
-  {
-    id: "budget_friendly",
-    label: "Budget Conscious",
-    description: "Delicious on a budget",
-    icon: DollarSign,
-    nutritionalFocus: "Maximum nutrients per dollar"
-  },
-  {
-    id: "athletic_performance",
-    label: "Athletic Performance",
-    description: "Fuel your workouts and recovery",
-    icon: Dumbbell,
-    nutritionalFocus: "High protein, complex carbs, electrolytes"
-  },
+  { id: "date_night", label: "Date Night", description: "Romantic, impressive dining experience", icon: Heart, nutritionalFocus: "Mood-enhancing nutrients, moderate portions" },
+  { id: "family_dinner", label: "Family Dinner", description: "Wholesome meals for the whole family", icon: Users, nutritionalFocus: "Balanced nutrition, kid-friendly" },
+  { id: "quick_lunch", label: "Quick Weeknight", description: "Fast, energizing meals under 30 min", icon: Clock, nutritionalFocus: "Quick energy, sustained fuel" },
+  { id: "meal_prep", label: "Meal Prep", description: "Batch cooking for the week ahead", icon: Utensils, nutritionalFocus: "Consistent macros, protein-rich" },
+  { id: "budget_friendly", label: "Budget Conscious", description: "Delicious on a budget", icon: DollarSign, nutritionalFocus: "Maximum nutrients per dollar" },
+  { id: "athletic_performance", label: "Athletic Performance", description: "Fuel your workouts and recovery", icon: Dumbbell, nutritionalFocus: "High protein, complex carbs, electrolytes" },
 ];
 
 const healthGoalOptions = [
@@ -79,23 +42,19 @@ const healthGoalOptions = [
   { id: "anti_inflammatory", label: "Anti-Inflammatory", icon: Leaf },
 ];
 
-export const NutritionEnhancedContextSelection = ({ 
-  onSelectContext 
+export const NutritionEnhancedContextSelection = ({
+  onSelectContext,
 }: NutritionEnhancedContextSelectionProps) => {
   const [selectedContext, setSelectedContext] = useState<string>("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
-  const [showGoals, setShowGoals] = useState(false);
 
   const handleContextSelect = (contextId: string) => {
     setSelectedContext(contextId);
-    setShowGoals(true);
   };
 
   const toggleGoal = (goalId: string) => {
-    setSelectedGoals(prev => 
-      prev.includes(goalId) 
-        ? prev.filter(id => id !== goalId)
-        : [...prev, goalId]
+    setSelectedGoals((prev) =>
+      prev.includes(goalId) ? prev.filter((id) => id !== goalId) : [...prev, goalId]
     );
   };
 
@@ -114,79 +73,85 @@ export const NutritionEnhancedContextSelection = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Context options as accessible buttons */}
+      <div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        role="radiogroup"
+        aria-label="Recipe context"
+      >
         {contextOptions.map((option) => {
           const Icon = option.icon;
           const isSelected = selectedContext === option.id;
-          
+
           return (
-            <Card
+            <button
               key={option.id}
-              className={`p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${
-                isSelected 
-                  ? 'ring-2 ring-primary bg-primary/5' 
-                  : 'hover:border-primary/50'
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              className={`p-6 rounded-lg border text-left transition-all hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                isSelected
+                  ? "ring-2 ring-primary bg-primary/5 border-primary"
+                  : "bg-card border-border hover:border-primary/50"
               }`}
               onClick={() => handleContextSelect(option.id)}
             >
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                  }`}>
+                  <div
+                    className={`p-2 rounded-lg ${
+                      isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                    }`}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                   <h3 className="font-semibold text-lg">{option.label}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {option.description}
-                </p>
+                <p className="text-sm text-muted-foreground">{option.description}</p>
                 <Badge variant="outline" className="text-xs">
                   {option.nutritionalFocus}
                 </Badge>
               </div>
-            </Card>
+            </button>
           );
         })}
       </div>
 
-      {showGoals && selectedContext && (
+      {/* Health goals as accessible toggle buttons */}
+      {selectedContext && (
         <div className="space-y-4 p-6 bg-muted/30 rounded-lg border-2 border-dashed border-primary/20">
           <div className="text-center space-y-2">
-            <h3 className="text-xl font-semibold">
-              Optional: Add Health Goals
-            </h3>
+            <h3 className="text-xl font-semibold">Optional: Add Health Goals</h3>
             <p className="text-sm text-muted-foreground">
               Select additional nutritional objectives for your recipe
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center" role="group" aria-label="Health goals">
             {healthGoalOptions.map((goal) => {
               const Icon = goal.icon;
               const isSelected = selectedGoals.includes(goal.id);
-              
+
               return (
-                <Badge
+                <Button
                   key={goal.id}
+                  type="button"
                   variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer px-4 py-2 text-sm hover:scale-105 transition-transform"
+                  size="sm"
+                  className="px-4 py-2"
                   onClick={() => toggleGoal(goal.id)}
+                  aria-pressed={isSelected}
                 >
                   <Icon className="h-3 w-3 mr-1" />
                   {goal.label}
-                </Badge>
+                </Button>
               );
             })}
           </div>
 
           <div className="flex justify-center pt-4">
-            <Button
-              onClick={handleConfirm}
-              size="lg"
-              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity px-12"
-            >
-              Continue to Recipe Generation
+            <Button onClick={handleConfirm} size="lg" className="px-12">
+              Confirm Selection
             </Button>
           </div>
         </div>

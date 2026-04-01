@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChefHat, User, LogOut, Heart, HeartPulse } from "lucide-react";
+import { Utensils, User, LogOut, Heart, HeartPulse } from "lucide-react";
 import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -23,24 +23,20 @@ interface Profile {
 const Navigation = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const location = useLocation();
+
+  const isRecovery = location.pathname.startsWith("/recovery");
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
+      if (session?.user) fetchProfile(session.user.id);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
+      if (session?.user) fetchProfile(session.user.id);
+      else setProfile(null);
     });
 
     return () => subscription.unsubscribe();
@@ -52,10 +48,7 @@ const Navigation = () => {
       .select("username, avatar_url")
       .eq("user_id", userId)
       .single();
-
-    if (data) {
-      setProfile(data);
-    }
+    if (data) setProfile(data);
   };
 
   const handleSignOut = async () => {
@@ -64,31 +57,45 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className={`border-b backdrop-blur supports-[backdrop-filter]:bg-background/60 ${
+      isRecovery ? "bg-secondary/5 border-secondary/20" : "bg-background/95"
+    }`}>
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 font-semibold text-xl">
-          <ChefHat className="w-6 h-6 text-primary" />
-          Recipe Community
+          <Utensils className="w-6 h-6 text-primary" />
+          NutriChef
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Link to="/">
+            <Button
+              variant={!isRecovery ? "secondary" : "ghost"}
+              size="sm"
+            >
+              <Utensils className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Recipes</span>
+            </Button>
+          </Link>
           <Link to="/recovery">
-            <Button variant="ghost" size="sm" className="text-secondary">
-              <HeartPulse className="w-4 h-4 mr-2" />
-              Recovery
+            <Button
+              variant={isRecovery ? "secondary" : "ghost"}
+              size="sm"
+            >
+              <HeartPulse className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Recovery</span>
             </Button>
           </Link>
           {user ? (
             <>
               <Link to="/my-recipes">
                 <Button variant="ghost" size="sm">
-                  <Heart className="w-4 h-4 mr-2" />
-                  My Recipes
+                  <Heart className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">My Recipes</span>
                 </Button>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="User menu">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={profile?.avatar_url || ""} alt={profile?.username || "User"} />
                       <AvatarFallback>
@@ -114,7 +121,7 @@ const Navigation = () => {
             </>
           ) : (
             <Link to="/auth">
-              <Button>Sign In</Button>
+              <Button size="sm">Sign In</Button>
             </Link>
           )}
         </div>
