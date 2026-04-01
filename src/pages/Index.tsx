@@ -252,8 +252,7 @@ const Index = () => {
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-full mb-4 animate-fade-in">
                 <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                 <span className="text-sm font-medium">Powered by Scientific Nutrition Data</span>
-                <Badge variant="secondary" className="text-xs">​2025
- </Badge>
+                <Badge variant="secondary" className="text-xs">2025</Badge>
               </div>
               
               <h2 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
