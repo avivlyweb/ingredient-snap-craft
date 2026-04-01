@@ -87,9 +87,11 @@ export function VoiceAssistant({ isOpen, onClose, recoveryContext }: VoiceAssist
   }, [currentAIResponse, addTranscript]);
 
   // Check when speaking stops to commit response
-  if (!isSpeaking && currentAIResponse) {
-    handleAIResponseComplete();
-  }
+  useEffect(() => {
+    if (!isSpeaking && currentAIResponse) {
+      handleAIResponseComplete();
+    }
+  }, [isSpeaking, currentAIResponse, handleAIResponseComplete]);
 
   const handleConsentAccept = () => {
     localStorage.setItem("voiceConsentAccepted", "true");
