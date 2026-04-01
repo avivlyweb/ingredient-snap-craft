@@ -87,6 +87,8 @@ const Recovery = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
   const [addedToGallery, setAddedToGallery] = useState(false);
+  const [loggedAsEaten, setLoggedAsEaten] = useState(false);
+  const [isLoggingAsEaten, setIsLoggingAsEaten] = useState(false);
   const [isClinicianMode, setIsClinicianMode] = useState(() => {
     return localStorage.getItem("recoveryClinicianMode") === "true";
   });
