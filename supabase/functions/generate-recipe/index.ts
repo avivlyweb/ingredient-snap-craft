@@ -27,11 +27,11 @@ serve(async (req) => {
   }
 
   try {
-    const { ingredients, contextType } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const { ingredients, contextType, recoveryGoals } = await req.json();
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     console.log('Generating recipe for ingredients:', ingredients, 'with context:', contextType);
