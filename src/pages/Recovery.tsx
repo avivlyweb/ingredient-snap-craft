@@ -24,7 +24,7 @@ import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope, Brain, LogIn } from "lucide-react";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope, Brain, LogIn, UtensilsCrossed } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 interface RecoveryGoals {
