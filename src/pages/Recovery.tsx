@@ -797,11 +797,35 @@ const Recovery = () => {
                 </div>
               </Card>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-4 flex-wrap">
                 <Button variant="outline" onClick={startOver}>
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Create Another Recipe
                 </Button>
+                {user && (
+                  <Button
+                    variant="secondary"
+                    onClick={handleLogAsEaten}
+                    disabled={isLoggingAsEaten || loggedAsEaten}
+                  >
+                    {isLoggingAsEaten ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Logging...
+                      </>
+                    ) : loggedAsEaten ? (
+                      <>
+                        <UtensilsCrossed className="w-4 h-4 mr-2" />
+                        Logged as Eaten ✓
+                      </>
+                    ) : (
+                      <>
+                        <UtensilsCrossed className="w-4 h-4 mr-2" />
+                        Log as Eaten
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button 
                   onClick={handleAddToGallery} 
                   disabled={isAddingToGallery || addedToGallery}
