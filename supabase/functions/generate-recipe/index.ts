@@ -27,11 +27,11 @@ serve(async (req) => {
   }
 
   try {
-    const { ingredients, contextType } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const { ingredients, contextType, recoveryGoals } = await req.json();
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     console.log('Generating recipe for ingredients:', ingredients, 'with context:', contextType);
@@ -71,6 +71,9 @@ NUTRITIONAL OPTIMIZATION GUIDELINES:
 ${isRecoveryContext ? `
 EVIDENCE-BASED PRACTICE RULES (ZorgAssistent Protocols):
 - Protein Targets: Strictly adhere to 1.5g/kg target for post-operative recovery (Ref: ESPEN guidelines for surgical patients)
+${recoveryGoals?.weight ? `- PATIENT WEIGHT: ${recoveryGoals.weight}kg => Daily protein target: ${(recoveryGoals.weight * 1.5).toFixed(0)}g (${(recoveryGoals.weight * 1.5 / 3).toFixed(0)}g per meal)` : ''}
+${recoveryGoals?.proteinTarget ? `- CUSTOM PROTEIN TARGET: ${recoveryGoals.proteinTarget}g/day` : ''}
+${recoveryGoals?.calorieTarget ? `- CALORIE TARGET: ${recoveryGoals.calorieTarget} kcal/day` : ''}
 - Data Source: Prioritize NEVO 2023 (v8.0) nutritional values where possible
 - For cancer_support context: Apply immunonutrition principles, prioritize Arginine/Omega-3s as per ERAS protocols
 - Generate DUAL-LAYER INSIGHTS for both patients and clinicians
@@ -149,14 +152,14 @@ CLINICAL RATIONALE REQUIREMENTS (clinical_rationale array):
 - Reference ERAS/ESPEN guidelines where applicable
 ` : ''}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",

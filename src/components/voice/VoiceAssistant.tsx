@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVoiceConversation } from "@/hooks/useVoiceConversation";
 import { VoiceWaveform } from "./VoiceWaveform";
@@ -87,9 +87,11 @@ export function VoiceAssistant({ isOpen, onClose, recoveryContext }: VoiceAssist
   }, [currentAIResponse, addTranscript]);
 
   // Check when speaking stops to commit response
-  if (!isSpeaking && currentAIResponse) {
-    handleAIResponseComplete();
-  }
+  useEffect(() => {
+    if (!isSpeaking && currentAIResponse) {
+      handleAIResponseComplete();
+    }
+  }, [isSpeaking, currentAIResponse, handleAIResponseComplete]);
 
   const handleConsentAccept = () => {
     localStorage.setItem("voiceConsentAccepted", "true");
@@ -175,7 +177,7 @@ export function VoiceAssistant({ isOpen, onClose, recoveryContext }: VoiceAssist
                     </div>
                   ) : transcripts.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-muted-foreground text-sm text-center">
-                      <p>Say something like:<br/>"I had eggs for breakfast"<br/>or "I walked for 10 minutes"</p>
+                      <p>Zeg bijvoorbeeld:<br/>"Ik heb twee eieren gegeten"<br/>of "Ik heb 10 minuten gelopen"</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
