@@ -24,7 +24,7 @@ import { HealthInsights } from "@/components/HealthInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
-import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope, Brain, LogIn } from "lucide-react";
+import { ArrowLeft, ChefHat, Drumstick, Flame, RefreshCw, Share2, Loader2, Stethoscope, Brain, LogIn, UtensilsCrossed } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 interface RecoveryGoals {
@@ -87,6 +87,8 @@ const Recovery = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
   const [addedToGallery, setAddedToGallery] = useState(false);
+  const [loggedAsEaten, setLoggedAsEaten] = useState(false);
+  const [isLoggingAsEaten, setIsLoggingAsEaten] = useState(false);
   const [isClinicianMode, setIsClinicianMode] = useState(() => {
     return localStorage.getItem("recoveryClinicianMode") === "true";
   });
@@ -266,6 +268,38 @@ const Recovery = () => {
     setIngredients([]);
     setCurrentRecipe(null);
     setAddedToGallery(false);
+    setLoggedAsEaten(false);
+  };
+
+  const handleLogAsEaten = async () => {
+    if (!currentRecipe || !user) {
+      toast.error("Please sign in to log meals");
+      return;
+    }
+
+    setIsLoggingAsEaten(true);
+    try {
+      const { error } = await supabase.from("food_logs").insert({
+        user_id: user.id,
+        items: currentRecipe.ingredients,
+        meal_type: "meal",
+        estimated_protein: currentRecipe.nutrition?.protein || 0,
+        estimated_calories: currentRecipe.nutrition?.calories || 0,
+        logged_via: "recipe",
+        protein_confidence: "medium",
+        data_source: "recipe_generated",
+      });
+
+      if (error) throw error;
+
+      setLoggedAsEaten(true);
+      toast.success("Maaltijd gelogd! Je Herstelindex wordt bijgewerkt.");
+    } catch (error) {
+      console.error("Error logging meal:", error);
+      toast.error("Kon maaltijd niet loggen. Probeer opnieuw.");
+    } finally {
+      setIsLoggingAsEaten(false);
+    }
   };
 
   const handleAddToGallery = async () => {
@@ -763,11 +797,35 @@ const Recovery = () => {
                 </div>
               </Card>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-4 flex-wrap">
                 <Button variant="outline" onClick={startOver}>
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Create Another Recipe
                 </Button>
+                {user && (
+                  <Button
+                    variant="secondary"
+                    onClick={handleLogAsEaten}
+                    disabled={isLoggingAsEaten || loggedAsEaten}
+                  >
+                    {isLoggingAsEaten ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Logging...
+                      </>
+                    ) : loggedAsEaten ? (
+                      <>
+                        <UtensilsCrossed className="w-4 h-4 mr-2" />
+                        Logged as Eaten ✓
+                      </>
+                    ) : (
+                      <>
+                        <UtensilsCrossed className="w-4 h-4 mr-2" />
+                        Log as Eaten
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button 
                   onClick={handleAddToGallery} 
                   disabled={isAddingToGallery || addedToGallery}
@@ -794,8 +852,8 @@ const Recovery = () => {
           )}
         </AnimatePresence>
 
-        {/* Clinician Dashboard - only in clinician mode */}
-        {isClinicianMode && recoveryGoals && currentStep !== "generating" && (
+        {/* Dashboard - shows for all authenticated users with recovery goals */}
+        {user && recoveryGoals && currentStep !== "generating" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
