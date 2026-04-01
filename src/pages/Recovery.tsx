@@ -852,8 +852,8 @@ const Recovery = () => {
           )}
         </AnimatePresence>
 
-        {/* Clinician Dashboard - only in clinician mode */}
-        {isClinicianMode && recoveryGoals && currentStep !== "generating" && (
+        {/* Dashboard - shows for all authenticated users with recovery goals */}
+        {user && recoveryGoals && currentStep !== "generating" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
